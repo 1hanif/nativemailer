@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Models\Email;
 use Exception;
+use Native\Desktop\Facades\ChildProcess;
+use Native\Desktop\Events\ChildProcess\MessageReceived;
 
 class SmtpCatcher
 {
@@ -232,6 +234,8 @@ class SmtpCatcher
 
             // Save
             Email::create($data);
+            event(new MessageReceived('smtp-catcher', $data));
+            ChildProcess::message('Email created', 'smtp-catcher');
 
             echo "Captured email from {$data['from']} to {$data['to']}\n";
         } catch (Exception $e) {

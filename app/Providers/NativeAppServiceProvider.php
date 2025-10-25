@@ -4,11 +4,12 @@ namespace App\Providers;
 
 use Native\Desktop\Facades\Window;
 use Native\Desktop\Contracts\ProvidesPhpIni;
-use Symfony\Component\Process\Process;
-use Illuminate\Support\ServiceProvider;
-use App\Services\SmtpServiceManager;
+use Illuminate\Support\Facades\Event;
+use Native\Desktop\Events\ChildProcess\MessageReceived;
+use Native\Desktop\Events\ChildProcess\ErrorReceived;
+use Native\Desktop\Facades\ChildProcess;
 
-class NativeAppServiceProvider extends ServiceProvider implements ProvidesPhpIni
+class NativeAppServiceProvider implements ProvidesPhpIni
 {
     /**
      * Executed once the native application has been booted.
@@ -16,14 +17,19 @@ class NativeAppServiceProvider extends ServiceProvider implements ProvidesPhpIni
      */
     public function boot(): void
     {
-        // Start SMTP when app opens
-        Window::on('booted', function () {
-            SmtpServiceManager::start();
+
+        Window::open();
+        ChildProcess::artisan('smtp:start', alias: 'smtp-catcher', persistent: true);
+        Event::listen(MessageReceived::class, function (MessageReceived $event) {
+            if ($event->alias === 'smtp-catcher') {
+                \Illuminate\Support\Facades\Log::info('SMTP Catcher Output: ' . $event->data);
+            }
         });
 
-        // Stop SMTP when app closes
-        Window::on('closing', function () {
-            SmtpServiceManager::stop();
+        Event::listen(ErrorReceived::class, function (ErrorReceived $event) {
+            if ($event->alias === 'smtp-catcher') {
+                \Illuminate\Support\Facades\Log::error('SMTP Catcher Error: ' . $event->data);
+            }
         });
     }
 

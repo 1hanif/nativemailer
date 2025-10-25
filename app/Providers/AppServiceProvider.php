@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use App\Services\SmtpServiceManager;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -19,6 +20,14 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        if (!SmtpServiceManager::isRunning()) {
+            SmtpServiceManager::start();
+            logger()->info('SMTP Catcher started automatically');
+        }
+
+        // Register shutdown handler to stop SMTP when app closes
+        register_shutdown_function(function () {
+            SmtpServiceManager::stop();
+        });
     }
 }

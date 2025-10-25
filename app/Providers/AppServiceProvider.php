@@ -20,14 +20,14 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        if (!SmtpServiceManager::isRunning()) {
-            SmtpServiceManager::start();
-            logger()->info('SMTP Catcher started automatically');
-        }
+        // if (!SmtpServiceManager::isRunning()) {
+        //     SmtpServiceManager::start();
+        //     logger()->info('SMTP Catcher started automatically');
+        // }
 
-        // Register shutdown handler to stop SMTP when app closes
-        register_shutdown_function(function () {
-            SmtpServiceManager::stop();
-        });
+        // // Register shutdown handler to stop SMTP when app closes
+        // register_shutdown_function(function () {
+        //     SmtpServiceManager::stop();
+        // });
     }
 }

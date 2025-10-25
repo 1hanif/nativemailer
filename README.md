@@ -1,62 +1,230 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Native Mailer 📧
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+A desktop email testing application built with Laravel, NativePHP, and Livewire. Native Mailer provides a local SMTP server that catches and displays emails sent from your development environment, making it easy to test email functionality without sending actual emails.
 
-## About Laravel
+## Features
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+✨ **Local SMTP Server** - Built-in SMTP server running on `127.0.0.1:1025`  
+📬 **Email Inbox** - Beautiful inbox interface to view all captured emails  
+🔍 **Search Functionality** - Quickly find emails by subject or sender  
+⚡ **Real-time Updates** - Powered by Livewire for a reactive user experience  
+💾 **SQLite Database** - Lightweight local database for email storage  
+🖥️ **Cross-platform** - Native desktop application for Windows, macOS, and Linux  
+🎨 **Modern UI** - Built with Tailwind CSS for a clean, modern interface
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Tech Stack
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+-   **PHP 8.2+**
+-   **Laravel 12**
+-   **NativePHP Desktop** - Build native desktop applications with PHP
+-   **Livewire 3** - Full-stack framework for Laravel
+-   **Tailwind CSS 4** - Utility-first CSS framework
+-   **SQLite** - Lightweight database
+-   **Vite** - Fast frontend build tool
 
-## Learning Laravel
+## Requirements
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+-   PHP 8.2 or higher
+-   Composer
+-   Node.js & npm
+-   SQLite
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+## Installation
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+1. **Clone the repository**
 
-## Laravel Sponsors
+    ```bash
+    git clone https://github.com/projecthanif/nativemailer.git
+    cd nativemailer
+    ```
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+2. **Install dependencies**
 
-### Premium Partners
+    ```bash
+    composer install
+    npm install
+    ```
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+3. **Set up environment**
+
+    ```bash
+    cp .env.example .env
+    php artisan key:generate
+    ```
+
+4. **Run migrations**
+
+    ```bash
+    php artisan migrate
+    ```
+
+5. **Build assets**
+    ```bash
+    npm run build
+    ```
+
+Or use the quick setup script:
+
+```bash
+composer setup
+```
+
+## Usage
+
+### Development Mode
+
+Run the application in development mode:
+
+```bash
+php artisan native:serve
+```
+
+This will:
+
+-   Start the NativePHP desktop application
+-   Launch the SMTP server on `127.0.0.1:1025`
+-   Open the email inbox interface
+
+### Building for Production
+
+Build native executables for your platform:
+
+```bash
+php artisan native:build
+```
+
+The built application will be available in the `builds` directory.
+
+### Configuring Your Application to Use Native Mailer
+
+Update your application's mail configuration to send emails through Native Mailer:
+
+**.env**
+
+```env
+MAIL_MAILER=smtp
+MAIL_HOST=127.0.0.1
+MAIL_PORT=1025
+MAIL_USERNAME=null
+MAIL_PASSWORD=null
+MAIL_ENCRYPTION=null
+```
+
+Now all emails sent from your application will be captured by Native Mailer!
+
+## Project Structure
+
+```
+app/
+├── Livewire/
+│   └── EmailInbox.php          # Main inbox component
+├── Models/
+│   └── Email.php               # Email model
+├── Services/
+│   ├── SmtpCatcher.php         # SMTP server implementation
+│   └── SmtpServiceManager.php  # Service manager
+└── Providers/
+    └── NativeAppServiceProvider.php  # NativePHP configuration
+
+database/
+└── migrations/
+    └── 2025_10_25_020118_create_emails_table.php
+
+resources/
+├── views/
+│   └── livewire/
+│       └── email-inbox.blade.php  # Inbox UI
+└── css/
+    └── app.css                     # Tailwind styles
+```
+
+## Features in Detail
+
+### SMTP Server
+
+The built-in SMTP server (`SmtpCatcher.php`) implements a basic SMTP protocol that:
+
+-   Listens on port 1025
+-   Accepts connections from any mail client
+-   Parses incoming emails using `php-mime-mail-parser`
+-   Stores emails in the local SQLite database
+
+### Email Inbox
+
+The inbox interface provides:
+
+-   Paginated list of all received emails
+-   Search by subject or sender
+-   Email preview with full content display
+-   Responsive design
+
+### Database Schema
+
+Emails are stored with the following structure:
+
+-   `from` - Sender email address
+-   `to` - Recipient email address(es)
+-   `subject` - Email subject
+-   `body` - Email body content
+-   `headers` - Raw email headers
+-   `received_at` - Timestamp when email was received
+
+## Development
+
+### Running Tests
+
+```bash
+php artisan test
+```
+
+Or with Pest:
+
+```bash
+./vendor/bin/pest
+```
+
+### Code Style
+
+Format code using Laravel Pint:
+
+```bash
+./vendor/bin/pint
+```
+
+### Watching Assets
+
+During development, watch for asset changes:
+
+```bash
+npm run dev
+```
 
 ## Contributing
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+Contributions are welcome! Please feel free to submit a Pull Request.
 
-## Code of Conduct
-
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
-
-## Security Vulnerabilities
-
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
 ## License
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
-# nativemailer
+This project is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+
+## Acknowledgments
+
+-   [Laravel](https://laravel.com) - The PHP Framework for Web Artisans
+-   [NativePHP](https://nativephp.com) - Build native desktop applications with PHP
+-   [Livewire](https://livewire.laravel.com) - A full-stack framework for Laravel
+-   [Tailwind CSS](https://tailwindcss.com) - A utility-first CSS framework
+
+## Author
+
+**Mustapha Hanif**  
+GitHub: [@projecthanif](https://github.com/projecthanif)
+
+---
+
+Made with ❤️ using Laravel and NativePHP

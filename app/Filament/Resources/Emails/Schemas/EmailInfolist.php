@@ -20,11 +20,9 @@ class EmailInfolist
                 TextEntry::make('received_at')
                     ->dateTime(),
                 TextEntry::make('body_html')
-                    ->placeholder('-')
+                    ->hiddenLabel()
                     ->view('filament.email-html-view')
                     ->columnSpanFull(),
-                // TextEntry::make('attachments')
-                //     ->placeholder('-'),
             ]);
     }
 }

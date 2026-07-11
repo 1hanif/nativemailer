@@ -1,6 +1,8 @@
 <div align="center">
 
-# 📧 Native Mailer
+<img src="./image.png" style="width:100px;height:100px;" alt="Native Mailer logo" />
+<br />
+# Native Mailer
 
 ### A Modern Desktop Email Testing Application
 

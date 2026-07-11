@@ -55,7 +55,7 @@ class AdminPanelProvider extends PanelProvider
             ->authMiddleware([
                 // Authenticate::class,
             ])
-            ->sidebarCollapsibleOnDesktop()
+            ->navigation(false)
             ->topbar(false)
             ->font('JetBrains Mono', provider: GoogleFontProvider::class);
     }

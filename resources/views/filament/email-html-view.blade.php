@@ -1,69 +1,267 @@
-{{-- Rendered inside the infolist — must NOT wrap in <x-filament-panels::page>,
-     that duplicates the page header/breadcrumbs --}}
-<div>
-    @php
-        $email = $this->getRecord();
-    @endphp
+{{-- Mailpit-style tabbed message viewer.
+Rendered inside the infolist — must NOT wrap in <x-filament-panels::page>,
+    that duplicates the page header/breadcrumbs --}}
+    <div x-data="{ tab: 'html' }" class="email-viewer">
 
-    @if (filled($email->body_html))
-        <div class="email-preview-container">
-            {{-- Fully sandboxed: no scripts, no same-origin access — email HTML is untrusted --}}
-            <iframe srcdoc="{{ $email->body_html }}" class="email-iframe" sandbox=""
-                title="Email Preview"></iframe>
-        </div>
-    @elseif (filled($email->body_text))
-        <div class="email-preview-container">
-            <pre class="email-text">{{ $email->body_text }}</pre>
-        </div>
-    @else
-        <div class="email-preview-empty">
-            This email has no content.
-        </div>
-    @endif
+        @php
+            use App\Support\MimeHeader;
 
-    <style>
-        .email-preview-container {
-            width: 100%;
-            border: 1px solid #e5e7eb;
-            border-radius: 0.5rem;
-            overflow: hidden;
-            background: white;
-        }
+            $email = $this->getRecord();
+            $raw = $email->raw ?? '';
 
-        .email-iframe {
-            width: 100%;
-            height: 600px;
-            border: none;
-            display: block;
-        }
-
-        .email-text {
-            margin: 0;
-            padding: 1.5rem;
-            min-height: 200px;
-            max-height: 600px;
-            overflow: auto;
-            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-            font-size: 0.875rem;
-            line-height: 1.6;
-            color: #1f2937;
-            white-space: pre-wrap;
-            word-break: break-word;
-        }
-
-        .email-preview-empty {
-            padding: 2rem;
-            text-align: center;
-            color: #9ca3af;
-            border: 1px dashed #e5e7eb;
-            border-radius: 0.5rem;
-        }
-
-        @media (prefers-color-scheme: dark) {
-            .email-preview-empty {
-                border-color: #374151;
-                color: #6b7280;
+            // Parse the header block (before first blank line), unfold continuations
+            $normalized = str_replace(["\r\n", "\r"], "\n", $raw);
+            $headerBlock = explode("\n\n", $normalized, 2)[0] ?? '';
+            $headerBlock = preg_replace('/\n[ \t]+/', ' ', $headerBlock);
+            $parsedHeaders = [];
+            foreach (explode("\n", $headerBlock) as $line) {
+                $pos = strpos($line, ':');
+                if ($pos !== false && $pos > 0) {
+                    $parsedHeaders[] = [trim(substr($line, 0, $pos)), MimeHeader::decode(trim(substr($line, $pos + 1)))];
+                }
             }
-        }
-    </style>
-</div>
+
+            $attachments = $email->attachments ?? [];
+        @endphp
+
+        {{-- Tab bar --}}
+        <div class="ev-tabs" role="tablist">
+            <button type="button" role="tab" @click="tab = 'html'"
+                :class="{ 'ev-active': tab === 'html' }">HTML</button>
+            <button type="button" role="tab" @click="tab = 'source'" :class="{ 'ev-active': tab === 'source' }">HTML
+                Source</button>
+            <button type="button" role="tab" @click="tab = 'text'"
+                :class="{ 'ev-active': tab === 'text' }">Text</button>
+            <button type="button" role="tab" @click="tab = 'headers'" :class="{ 'ev-active': tab === 'headers' }">
+                Headers <span class="ev-badge">{{ count($parsedHeaders) }}</span>
+            </button>
+            <button type="button" role="tab" @click="tab = 'raw'" :class="{ 'ev-active': tab === 'raw' }">Raw</button>
+            <button type="button" role="tab" @click="tab = 'attachments'"
+                :class="{ 'ev-active': tab === 'attachments' }">
+                Attachments <span class="ev-badge">{{ count($attachments) }}</span>
+            </button>
+            <span class="ev-meta">{{ number_format(strlen($raw) / 1024, 1) }} KB</span>
+        </div>
+
+        {{-- HTML preview --}}
+        <div x-show="tab === 'html'" role="tabpanel">
+            @if (filled($email->body_html))
+                <div class="ev-panel ev-white">
+                    {{-- Fully sandboxed: no scripts, no same-origin access — email HTML is untrusted --}}
+                    <iframe srcdoc="{{ $email->body_html }}" class="ev-iframe" sandbox="" title="Email Preview"></iframe>
+                </div>
+            @elseif (filled($email->body_text))
+                <div class="ev-panel ev-white">
+                    <pre class="ev-pre ev-dark-text">{{ $email->body_text }}</pre>
+                </div>
+            @else
+                <div class="ev-empty">This email has no content.</div>
+            @endif
+        </div>
+
+        {{-- HTML source --}}
+        <div x-show="tab === 'source'" role="tabpanel" style="display: none;">
+            @if (filled($email->body_html))
+                <div class="ev-panel">
+                    <pre class="ev-pre">{{ $email->body_html }}</pre>
+                </div>
+            @else
+                <div class="ev-empty">No HTML part.</div>
+            @endif
+        </div>
+
+        {{-- Text part --}}
+        <div x-show="tab === 'text'" role="tabpanel" style="display: none;">
+            @if (filled($email->body_text))
+                <div class="ev-panel">
+                    <pre class="ev-pre">{{ $email->body_text }}</pre>
+                </div>
+            @else
+                <div class="ev-empty">No text part.</div>
+            @endif
+        </div>
+
+        {{-- Headers --}}
+        <div x-show="tab === 'headers'" role="tabpanel" style="display: none;">
+            @if (count($parsedHeaders))
+                <div class="ev-panel">
+                    <table class="ev-headers">
+                        @foreach ($parsedHeaders as [$name, $value])
+                            <tr>
+                                <td class="ev-hname">{{ $name }}</td>
+                                <td class="ev-hvalue">{{ $value }}</td>
+                            </tr>
+                        @endforeach
+                    </table>
+                </div>
+            @else
+                <div class="ev-empty">No headers captured.</div>
+            @endif
+        </div>
+
+        {{-- Raw message --}}
+        <div x-show="tab === 'raw'" role="tabpanel" style="display: none;">
+            @if (filled($raw))
+                <div class="ev-panel">
+                    <pre class="ev-pre">{{ $raw }}</pre>
+                </div>
+            @else
+                <div class="ev-empty">Raw message not stored.</div>
+            @endif
+        </div>
+
+        {{-- Attachments --}}
+        <div x-show="tab === 'attachments'" role="tabpanel" style="display: none;">
+            @if (count($attachments))
+                <div class="ev-panel">
+                    <table class="ev-headers">
+                        @foreach ($attachments as $att)
+                            <tr>
+                                <td class="ev-hname">{{ $att['name'] ?? 'unnamed' }}</td>
+                                <td class="ev-hvalue">
+                                    {{ $att['content_type'] ?? 'application/octet-stream' }}
+                                    &middot; {{ number_format(($att['size'] ?? 0) / 1024, 1) }} KB
+                                    @if (!empty($att['content']))
+                                        &middot; <a class="ev-link"
+                                            href="data:{{ $att['content_type'] ?? 'application/octet-stream' }};base64,{{ $att['content'] }}"
+                                            download="{{ $att['name'] ?? 'attachment' }}">Download</a>
+                                    @endif
+                                </td>
+                            </tr>
+                        @endforeach
+                    </table>
+                </div>
+            @else
+                <div class="ev-empty">No attachments.</div>
+            @endif
+        </div>
+
+        <style>
+            .email-viewer {
+                width: 100%;
+            }
+
+            .ev-tabs {
+                display: flex;
+                align-items: center;
+                gap: 0.25rem;
+                border-bottom: 1px solid rgba(128, 128, 128, 0.3);
+                margin-bottom: 1rem;
+                flex-wrap: wrap;
+            }
+
+            .ev-tabs button {
+                padding: 0.5rem 0.9rem;
+                font-size: 0.875rem;
+                color: inherit;
+                opacity: 0.6;
+                background: none;
+                border: none;
+                border-bottom: 2px solid transparent;
+                cursor: pointer;
+                margin-bottom: -1px;
+            }
+
+            .ev-tabs button:hover {
+                opacity: 0.9;
+            }
+
+            .ev-tabs button.ev-active {
+                opacity: 1;
+                font-weight: 600;
+                border-bottom-color: #f59e0b;
+            }
+
+            .ev-badge {
+                display: inline-block;
+                min-width: 1.25rem;
+                padding: 0 0.35rem;
+                border-radius: 9999px;
+                background: rgba(128, 128, 128, 0.25);
+                font-size: 0.72rem;
+                text-align: center;
+            }
+
+            .ev-meta {
+                margin-left: auto;
+                font-size: 0.75rem;
+                opacity: 0.5;
+                padding-right: 0.25rem;
+            }
+
+            .ev-panel {
+                border: 1px solid rgba(128, 128, 128, 0.3);
+                border-radius: 0.5rem;
+                overflow: hidden;
+            }
+
+            .ev-white {
+                /* Near-white: emails are designed for white backgrounds,
+                   but full #fff glares in the dark UI */
+                background: #f8fafc;
+            }
+
+            .ev-iframe {
+                width: 100%;
+                height: 600px;
+                border: none;
+                display: block;
+            }
+
+            .ev-pre {
+                margin: 0;
+                padding: 1.25rem;
+                max-height: 600px;
+                overflow: auto;
+                font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+                font-size: 0.8125rem;
+                line-height: 1.6;
+                white-space: pre-wrap;
+                word-break: break-word;
+            }
+
+            .ev-dark-text {
+                color: #1f2937;
+            }
+
+            .ev-headers {
+                width: 100%;
+                border-collapse: collapse;
+                font-size: 0.8125rem;
+            }
+
+            .ev-headers td {
+                padding: 0.5rem 1rem;
+                border-bottom: 1px solid rgba(128, 128, 128, 0.15);
+                vertical-align: top;
+            }
+
+            .ev-headers tr:last-child td {
+                border-bottom: none;
+            }
+
+            .ev-hname {
+                font-weight: 600;
+                white-space: nowrap;
+                width: 1%;
+            }
+
+            .ev-hvalue {
+                font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+                word-break: break-all;
+            }
+
+            .ev-link {
+                color: #f59e0b;
+                text-decoration: underline;
+            }
+
+            .ev-empty {
+                padding: 2rem;
+                text-align: center;
+                opacity: 0.5;
+                border: 1px dashed rgba(128, 128, 128, 0.4);
+                border-radius: 0.5rem;
+            }
+        </style>
+    </div>

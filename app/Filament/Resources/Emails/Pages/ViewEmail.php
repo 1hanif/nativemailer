@@ -3,7 +3,6 @@
 namespace App\Filament\Resources\Emails\Pages;
 
 use App\Filament\Resources\Emails\EmailResource;
-use Filament\Actions\EditAction;
 use Filament\Resources\Pages\ViewRecord;
 
 class ViewEmail extends ViewRecord
@@ -13,7 +12,6 @@ class ViewEmail extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
-            EditAction::make(),
         ];
     }
 }

@@ -115,4 +115,20 @@ return [
         'name' => env('MAIL_FROM_NAME', 'Example'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Local SMTP Catcher
+    |--------------------------------------------------------------------------
+    |
+    | Address the built-in SMTP catcher listens on. Point MAIL_HOST /
+    | MAIL_PORT at the same values so outgoing mail is captured.
+    |
+    */
+
+    'catcher' => [
+        'host' => env('SMTP_CATCHER_HOST', '127.0.0.1'),
+        'port' => env('SMTP_CATCHER_PORT', 1025),
+        'timeout' => env('SMTP_CATCHER_TIMEOUT', 30),
+    ],
+
 ];

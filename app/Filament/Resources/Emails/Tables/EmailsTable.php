@@ -14,6 +14,8 @@ class EmailsTable
     public static function configure(Table $table): Table
     {
         return $table
+            ->poll('5s')
+            ->defaultSort('received_at', 'desc')
             ->columns([
                 TextColumn::make('from')
                     ->searchable(),

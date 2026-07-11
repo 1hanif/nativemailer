@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Setting;
 use App\Services\Smtp\PersistCapturedEmail;
 use App\Services\Smtp\SmtpServer;
 
@@ -22,10 +23,19 @@ class SmtpCatcher
     {
         $this->server = new SmtpServer(
             host: config('mail.catcher.host', '127.0.0.1'),
-            port: (int) config('mail.catcher.port', 1025),
+            port: self::port(),
             timeout: (int) config('mail.catcher.timeout', 30),
             onMessage: new PersistCapturedEmail(),
         );
+    }
+
+    /**
+     * The active port: dashboard setting wins, .env is the default.
+     * Read at boot only — changing it requires a catcher restart.
+     */
+    public static function port(): int
+    {
+        return (int) Setting::get('smtp_port', config('mail.catcher.port', 1025));
     }
 
     public function start(): void

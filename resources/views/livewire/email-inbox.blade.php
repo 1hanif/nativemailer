@@ -1,4 +1,5 @@
-<div class="flex h-screen bg-white">
+{{-- wire:poll is a fallback; the native:MessageReceived listener updates instantly --}}
+<div class="flex h-screen bg-white" wire:poll.10s>
     <!-- Left Sidebar - Folders & Labels -->
     <div class="w-64 border-r border-gray-200 bg-white flex flex-col">
         <!-- Logo/Header -->

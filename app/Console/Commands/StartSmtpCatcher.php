@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Log;
 use App\Services\SmtpCatcher;
 
 class StartSmtpCatcher extends Command
@@ -12,13 +13,18 @@ class StartSmtpCatcher extends Command
 
     public function handle(SmtpCatcher $catcher)
     {
+        // Avoid writing to stdout: when run as a NativePHP child process,
+        // stdout is piped to Electron and can crash the app (EPIPE) if the
+        // launching terminal has gone away. Log to file instead.
         try {
-            $this->info('Starting SMTP Catcher on 127.0.0.1:1025...');
+            Log::info('Starting SMTP Catcher...');
             $catcher->start();
-            $this->info('SMTP Catcher started successfully.');
         } catch (\Exception $e) {
-            $this->error('Failed to start SMTP Catcher: ' . $e->getMessage() . " in line " . $e->getLine());
+            Log::error('Failed to start SMTP Catcher: ' . $e->getMessage() . ' in line ' . $e->getLine());
 
+            return self::FAILURE;
         }
+
+        return self::SUCCESS;
     }
 }

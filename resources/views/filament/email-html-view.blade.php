@@ -57,6 +57,39 @@ Rendered inside the infolist — must NOT wrap in <x-filament-panels::page>,
             @else
                 <div class="ev-empty">This email has no content.</div>
             @endif
+
+            {{-- Attachment strip (Mailpit-style, below the message body) --}}
+            @if (count($attachments))
+                <div class="ev-attach-strip">
+                    @foreach ($attachments as $att)
+                        @php
+                            $type = $att['content_type'] ?? 'application/octet-stream';
+                            $isImage = str_starts_with($type, 'image/') && !empty($att['content']);
+                            $dataUri = !empty($att['content']) ? "data:{$type};base64,{$att['content']}" : null;
+                        @endphp
+                        <a class="ev-attach-card" @if ($dataUri) href="{{ $dataUri }}"
+                            download="{{ $att['name'] ?? 'attachment' }}" @endif>
+                            @if ($isImage)
+                                <img src="{{ $dataUri }}" alt="{{ $att['name'] ?? 'attachment' }}"
+                                    class="ev-attach-thumb">
+                            @else
+                                <span class="ev-attach-icon">
+                                    <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"
+                                        viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                            d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                                    </svg>
+                                </span>
+                            @endif
+                            <span class="ev-attach-info">
+                                <span class="ev-attach-name">{{ $att['name'] ?? 'unnamed' }}</span>
+                                <span class="ev-attach-size">{{ number_format(($att['size'] ?? 0) / 1024, 1) }}
+                                    KB</span>
+                            </span>
+                        </a>
+                    @endforeach
+                </div>
+            @endif
         </div>
 
         {{-- HTML source --}}
@@ -254,6 +287,67 @@ Rendered inside the infolist — must NOT wrap in <x-filament-panels::page>,
             .ev-link {
                 color: #f59e0b;
                 text-decoration: underline;
+            }
+
+            .ev-attach-strip {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 0.6rem;
+                margin-top: 0.75rem;
+            }
+
+            .ev-attach-card {
+                display: flex;
+                align-items: center;
+                gap: 0.6rem;
+                padding: 0.5rem 0.9rem 0.5rem 0.5rem;
+                border: 1px solid rgba(128, 128, 128, 0.3);
+                border-radius: 0.5rem;
+                text-decoration: none;
+                color: inherit;
+                max-width: 16rem;
+            }
+
+            .ev-attach-card:hover {
+                border-color: #f59e0b;
+            }
+
+            .ev-attach-thumb {
+                width: 2.5rem;
+                height: 2.5rem;
+                object-fit: cover;
+                border-radius: 0.375rem;
+                background: #f8fafc;
+            }
+
+            .ev-attach-icon {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                width: 2.5rem;
+                height: 2.5rem;
+                border-radius: 0.375rem;
+                background: rgba(128, 128, 128, 0.15);
+                opacity: 0.8;
+            }
+
+            .ev-attach-info {
+                display: flex;
+                flex-direction: column;
+                min-width: 0;
+            }
+
+            .ev-attach-name {
+                font-size: 0.8125rem;
+                font-weight: 600;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+
+            .ev-attach-size {
+                font-size: 0.72rem;
+                opacity: 0.55;
             }
 
             .ev-empty {

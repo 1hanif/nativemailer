@@ -9,6 +9,13 @@ class ViewEmail extends ViewRecord
 {
     protected static string $resource = EmailResource::class;
 
+    public function mount(int|string $record): void
+    {
+        parent::mount($record);
+
+        $this->getRecord()->markAsRead();
+    }
+
     protected function getHeaderActions(): array
     {
         return [

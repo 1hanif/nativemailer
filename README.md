@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="./image.png" style="width:100px;height:100px;" alt="Native Mailer logo" />
+<img src="./logo.png" style="width:100px;height:100px;" alt="Native Mailer logo" />
 <br />
 # Native Mailer
 

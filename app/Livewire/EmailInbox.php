@@ -3,10 +3,10 @@
 namespace App\Livewire;
 
 use Livewire\Component;
+use App\Events\EmailReceived;
 use App\Models\Email;
 use Livewire\Attributes\On;
 use Livewire\WithPagination;
-use Native\Desktop\Events\ChildProcess\MessageReceived;
 
 class EmailInbox extends Component
 {
@@ -17,10 +17,11 @@ class EmailInbox extends Component
 
     /**
      * Re-render as soon as the SMTP catcher reports a new email.
-     * The catcher's ChildProcess::message() triggers MessageReceived,
-     * which NativePHP broadcasts to the frontend on the 'nativephp' channel.
+     * The catcher dispatches EmailReceived; NativePHP's EventWatcher
+     * broadcasts it to the frontend on the 'nativephp' channel with a
+     * leading backslash on the class name.
      */
-    #[On('native:' . MessageReceived::class)]
+    #[On('native:\\' . EmailReceived::class)]
     public function onEmailReceived()
     {
         // Empty on purpose: receiving the event triggers a re-render.
@@ -29,6 +30,7 @@ class EmailInbox extends Component
     public function view($id)
     {
         $this->selectedEmail = Email::find($id);
+        $this->selectedEmail?->markAsRead();
     }
 
     public function updatingSearch()

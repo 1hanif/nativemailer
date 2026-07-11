@@ -16,13 +16,22 @@ class Email extends Model
         'body_html',
         'attachments',
         'raw',
-        'received_at'
+        'received_at',
+        'is_read',
     ];
 
     protected $casts = [
         'attachments' => 'array',
         'received_at' => 'datetime',
+        'is_read' => 'boolean',
     ];
+
+    public function markAsRead(): void
+    {
+        if (!$this->is_read) {
+            $this->update(['is_read' => true]);
+        }
+    }
 
     /**
      * Decode RFC 2047 encoded-words at display time. Covers rows that

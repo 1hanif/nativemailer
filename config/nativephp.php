@@ -86,6 +86,17 @@ return [
         'content',
         'node_modules',
         '*/tests',
+        'tests',
+        'README.md',
+        'phpunit.xml',
+        'send_test_email.py',
+        '.env.example',
+        'package-lock.json',
+        'composer.lock',
+        'vendor/*/*/docs',
+        'vendor/*/*/.github',
+        'vendor/*/*/CHANGELOG.md',
+        'vendor/*/*/UPGRADE.md',
     ],
 
     /**

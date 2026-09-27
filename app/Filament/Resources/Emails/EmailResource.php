@@ -2,11 +2,8 @@
 
 namespace App\Filament\Resources\Emails;
 
-use App\Filament\Resources\Emails\Pages\CreateEmail;
-use App\Filament\Resources\Emails\Pages\EditEmail;
 use App\Filament\Resources\Emails\Pages\ListEmails;
 use App\Filament\Resources\Emails\Pages\ViewEmail;
-use App\Filament\Resources\Emails\Schemas\EmailForm;
 use App\Filament\Resources\Emails\Schemas\EmailInfolist;
 use App\Filament\Resources\Emails\Tables\EmailsTable;
 use App\Models\Email;
@@ -23,11 +20,6 @@ class EmailResource extends Resource
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
     protected static ?string $recordTitleAttribute = 'from';
-
-    public static function form(Schema $schema): Schema
-    {
-        return EmailForm::configure($schema);
-    }
 
     public static function infolist(Schema $schema): Schema
     {
@@ -46,13 +38,17 @@ class EmailResource extends Resource
         ];
     }
 
+    /** Emails are only ever captured by the SMTP catcher, never created by hand */
+    public static function canCreate(): bool
+    {
+        return false;
+    }
+
     public static function getPages(): array
     {
         return [
             'index' => ListEmails::route('/'),
-            'create' => CreateEmail::route('/create'),
             'view' => ViewEmail::route('/{record}'),
-            'edit' => EditEmail::route('/{record}/edit'),
         ];
     }
 }

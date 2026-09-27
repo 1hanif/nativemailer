@@ -23,11 +23,9 @@ class EmailsTable
         $unreadWeight = fn (Email $record) => $record->is_read ? FontWeight::Normal : FontWeight::Bold;
 
         return $table
-            ->poll('5s')
-            // Skip body/raw columns: the list only needs headers
-            ->modifyQueryUsing(fn (Builder $query) => $query
-                ->select(Email::LIST_COLUMNS)
-                ->withExists('attachments'))
+            // Live refresh comes from the EmailReceived event (see ListEmails);
+            // this slow poll is only a fallback, e.g. in a plain browser
+            ->poll('30s')
             ->defaultSort('received_at', 'desc')
             ->columns([
                 TextColumn::make('is_read')

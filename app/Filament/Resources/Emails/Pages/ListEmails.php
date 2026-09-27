@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Emails\Pages;
 
+use App\Events\EmailReceived;
 use App\Filament\Resources\Emails\EmailResource;
 use App\Models\Setting;
 use App\Services\SmtpCatcher;
@@ -9,11 +10,23 @@ use Filament\Actions\Action;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
+use Livewire\Attributes\On;
 use Native\Desktop\Facades\ChildProcess;
 
 class ListEmails extends ListRecords
 {
     protected static string $resource = EmailResource::class;
+
+    /**
+     * Re-render the table as soon as the SMTP catcher reports a new email.
+     * NativePHP's EventWatcher broadcasts EmailReceived to every window,
+     * where it arrives as a Livewire event named with a leading backslash.
+     */
+    #[On('native:\\' . EmailReceived::class)]
+    public function onEmailReceived(): void
+    {
+        // Empty on purpose: receiving the event triggers a re-render.
+    }
 
     protected function getHeaderActions(): array
     {

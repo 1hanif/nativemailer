@@ -61,7 +61,8 @@ class NativeAppServiceProvider implements ProvidesPhpIni
     {
         return [
             'memory_limit' => '512M',
-            'display_errors' => '1',
+            // Errors go to the log; never render them into the app window
+            'display_errors' => '0',
             'error_reporting' => 'E_ALL',
             'max_execution_time' => '0',
             'max_input_time' => '0',

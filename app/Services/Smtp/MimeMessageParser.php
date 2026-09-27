@@ -221,7 +221,7 @@ class MimeMessageParser
                 'size' => strlen($decoded),
                 'content_id' => $contentId ?: null,
                 'inline' => $contentId && stripos($disposition, 'attachment') === false,
-                'content' => base64_encode($decoded),
+                'content' => $decoded,
             ];
         } elseif ($mimeType === 'text/html') {
             $result['html'] = $result['html'] ?? self::toUtf8($decoded, $typeParams['charset'] ?? null);

@@ -9,9 +9,11 @@ use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\ViewAction;
 use Filament\Support\Enums\FontWeight;
+use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 
 class EmailsTable
@@ -22,6 +24,10 @@ class EmailsTable
 
         return $table
             ->poll('5s')
+            // Skip body/raw columns: the list only needs headers
+            ->modifyQueryUsing(fn (Builder $query) => $query
+                ->select(Email::LIST_COLUMNS)
+                ->withExists('attachments'))
             ->defaultSort('received_at', 'desc')
             ->columns([
                 TextColumn::make('is_read')
@@ -38,6 +44,11 @@ class EmailsTable
                 TextColumn::make('subject')
                     ->weight($unreadWeight)
                     ->searchable(),
+                IconColumn::make('attachments_exists')
+                    ->label('')
+                    ->icon(fn (bool $state) => $state ? 'heroicon-o-paper-clip' : null)
+                    ->tooltip(fn (bool $state) => $state ? 'Has attachments' : null)
+                    ->color('gray'),
                 TextColumn::make('received_at')
                     ->weight($unreadWeight)
                     ->dateTime()

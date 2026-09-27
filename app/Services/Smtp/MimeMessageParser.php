@@ -39,13 +39,19 @@ class MimeMessageParser
         $headers = $this->parseHeaders($headerString);
 
         $fromEmail = self::extractAddress($headers['from'] ?? null) ?? $envelopeFrom;
-        $toEmails = array_filter(array_map(
-            [self::class, 'extractAddress'],
-            preg_split('/\s*,\s*/', $headers['to'] ?? '', -1, PREG_SPLIT_NO_EMPTY) ?: []
-        ));
+        $toEmails = self::extractAddressList($headers['to'] ?? null);
         if (empty($toEmails)) {
             $toEmails = $envelopeRecipients;
         }
+        $ccEmails = self::extractAddressList($headers['cc'] ?? null);
+
+        // Bcc never appears in the delivered headers: it is whoever was on
+        // the SMTP envelope but not in To/Cc.
+        $visible = array_map('strtolower', [...$toEmails, ...$ccEmails]);
+        $bccEmails = array_values(array_unique(array_filter(
+            $envelopeRecipients,
+            fn (string $rcpt) => !in_array(strtolower($rcpt), $visible, true)
+        )));
 
         $result = ['text' => null, 'html' => null, 'attachments' => []];
         $this->parseMimePart($headers, $bodyString, $result);
@@ -53,6 +59,8 @@ class MimeMessageParser
         return [
             'from' => $fromEmail,
             'to' => implode(', ', $toEmails),
+            'cc' => $ccEmails ? implode(', ', $ccEmails) : null,
+            'bcc' => $bccEmails ? implode(', ', $bccEmails) : null,
             'subject' => MimeHeader::decode($headers['subject'] ?? null),
             'raw' => $rawMessage,
             'received_at' => now(),
@@ -74,9 +82,62 @@ class MimeMessageParser
         if (preg_match('/<([^>]+)>/', $string, $matches)) {
             return trim($matches[1]);
         }
-        $string = trim($string);
+        // No angle brackets: take the first token, dropping any trailing
+        // ESMTP parameters (e.g. "a@x.test SIZE=123")
+        $string = trim(preg_split('/\s+/', trim($string))[0] ?? '');
 
         return $string === '' ? null : $string;
+    }
+
+    /**
+     * Extract bare addresses from an address-list header, splitting only
+     * on commas outside quotes and angle brackets, so display names like
+     * "Doe, John" <j@x.test> stay intact.
+     *
+     * @return list<string>
+     */
+    public static function extractAddressList(?string $header): array
+    {
+        if ($header === null || trim($header) === '') {
+            return [];
+        }
+
+        $parts = [];
+        $current = '';
+        $inQuotes = false;
+        $inAngle = false;
+        $length = strlen($header);
+
+        for ($i = 0; $i < $length; $i++) {
+            $char = $header[$i];
+
+            if ($char === '\\' && $inQuotes && $i + 1 < $length) {
+                $current .= $char . $header[++$i];
+                continue;
+            }
+            if ($char === '"') {
+                $inQuotes = !$inQuotes;
+            } elseif (!$inQuotes && $char === '<') {
+                $inAngle = true;
+            } elseif (!$inQuotes && $char === '>') {
+                $inAngle = false;
+            } elseif ($char === ',' && !$inQuotes && !$inAngle) {
+                $parts[] = $current;
+                $current = '';
+                continue;
+            }
+            $current .= $char;
+        }
+        $parts[] = $current;
+
+        // Unwrap RFC 5322 groups ("Team: a@x.test, b@x.test;") and drop
+        // anything that isn't an address, e.g. "undisclosed-recipients:;"
+        $parts = array_map(fn ($part) => rtrim(preg_replace('/^[^"<@]*:/', '', $part), '; '), $parts);
+
+        return array_values(array_filter(
+            array_map([self::class, 'extractAddress'], $parts),
+            fn (?string $address) => $address !== null && str_contains($address, '@')
+        ));
     }
 
     /**

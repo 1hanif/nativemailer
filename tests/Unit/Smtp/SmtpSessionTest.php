@@ -6,7 +6,7 @@ use App\Services\Smtp\SmtpSession;
  * Drive a session with the given client lines; returns the replies and
  * any captured messages as [raw, from, recipients].
  */
-function runSession(array $lines): array
+function runSession(array $lines, int $maxMessageSize = 50 * 1024 * 1024): array
 {
     $replies = [];
     $messages = [];
@@ -19,6 +19,7 @@ function runSession(array $lines): array
             $messages[] = [$raw, $from, $recipients];
         },
         close: fn () => null,
+        maxMessageSize: $maxMessageSize,
     );
 
     $session->greet();
@@ -30,7 +31,7 @@ function runSession(array $lines): array
 test('EHLO advertises AUTH and other extensions as a multi-line reply', function () {
     [$replies] = runSession(['EHLO client.test']);
 
-    expect($replies[1])->toBe("250-localhost\r\n250-AUTH PLAIN LOGIN\r\n250-8BITMIME\r\n250 SMTPUTF8\r\n");
+    expect($replies[1])->toBe("250-localhost\r\n250-SIZE 52428800\r\n250-AUTH PLAIN LOGIN\r\n250-8BITMIME\r\n250 SMTPUTF8\r\n");
 });
 
 test('HELO keeps the single-line reply', function () {
@@ -103,4 +104,49 @@ test('an authenticated session delivers mail with every envelope recipient', fun
     expect($messages)->toHaveCount(1)
         ->and($messages[0][1])->toBe('sender@x.test')
         ->and($messages[0][2])->toBe(['to@x.test', 'hidden@x.test']);
+});
+
+test('a message over the size limit is refused with 552 and not stored', function () {
+    [$replies, $messages] = runSession([
+        'EHLO x', 'MAIL FROM:<a@x.test>', 'RCPT TO:<b@x.test>', 'DATA',
+        'Subject: big', '', str_repeat('x', 200), '.',
+        'NOOP',
+    ], maxMessageSize: 100);
+
+    expect($messages)->toBeEmpty()
+        ->and($replies[5])->toStartWith('552 ')
+        ->and($replies[6])->toBe("250 OK\r\n");
+});
+
+test('the session accepts a normal message after refusing an oversized one', function () {
+    [, $messages] = runSession([
+        'EHLO x', 'MAIL FROM:<a@x.test>', 'RCPT TO:<b@x.test>', 'DATA', str_repeat('x', 200), '.',
+        'MAIL FROM:<a@x.test>', 'RCPT TO:<b@x.test>', 'DATA', 'Subject: small', '', 'ok', '.',
+    ], maxMessageSize: 100);
+
+    expect($messages)->toHaveCount(1)
+        ->and($messages[0][0])->toContain('Subject: small');
+});
+
+test('a declared SIZE over the limit is refused at MAIL FROM', function () {
+    [$replies] = runSession(['EHLO x', 'MAIL FROM:<a@x.test> SIZE=5000'], maxMessageSize: 100);
+
+    expect($replies[2])->toStartWith('552 ');
+});
+
+test('an oversized line without CRLF in DATA is discarded', function () {
+    $replies = [];
+    $messages = [];
+    $session = new SmtpSession(
+        send: function (string $r) use (&$replies) { $replies[] = $r; },
+        onMessage: function (...$args) use (&$messages) { $messages[] = $args; },
+        close: fn () => null,
+        maxMessageSize: 100,
+    );
+    $session->feed("EHLO x\r\nMAIL FROM:<a@x.test>\r\nRCPT TO:<b@x.test>\r\nDATA\r\n");
+    $session->feed(str_repeat('x', 500));
+    $session->feed("\r\n.\r\n");
+
+    expect($messages)->toBeEmpty()
+        ->and(end($replies))->toStartWith('552 ');
 });

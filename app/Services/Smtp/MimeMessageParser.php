@@ -201,25 +201,115 @@ class MimeMessageParser
 
         // Leaf part
         $disposition = $headers['content-disposition'] ?? '';
-        $filename = null;
-        if (preg_match('/filename=(?:"([^"]+)"|([^;\s]+))/i', $disposition . ' ' . $contentType, $m)) {
-            $filename = $m[1] !== '' ? $m[1] : $m[2];
-        }
+        $mimeType = strtolower(trim(explode(';', $contentType)[0]));
+        $typeParams = self::parseParameters($contentType);
+        $filename = self::parseParameters($disposition)['filename'] ?? $typeParams['name'] ?? null;
+        $contentId = isset($headers['content-id']) ? trim($headers['content-id'], " <>") : null;
 
         $decoded = $this->decodeContent($body, $headers['content-transfer-encoding'] ?? '');
 
-        if ($filename !== null || stripos($disposition, 'attachment') !== false) {
+        $isBody = in_array($mimeType, ['text/plain', 'text/html'], true)
+            && $filename === null
+            && stripos($disposition, 'attachment') === false;
+
+        if (!$isBody) {
+            // Anything that isn't a plain/HTML body is kept as an attachment,
+            // including inline images referenced from the HTML via cid:
             $result['attachments'][] = [
-                'name' => MimeHeader::decode($filename) ?? 'unnamed',
-                'content_type' => trim(explode(';', $contentType)[0]),
+                'name' => MimeHeader::decode($filename) ?? ($contentId ?: 'unnamed'),
+                'content_type' => $mimeType,
                 'size' => strlen($decoded),
+                'content_id' => $contentId ?: null,
+                'inline' => $contentId && stripos($disposition, 'attachment') === false,
                 'content' => base64_encode($decoded),
             ];
-        } elseif (stripos($contentType, 'text/html') !== false) {
-            $result['html'] = $result['html'] ?? $decoded;
+        } elseif ($mimeType === 'text/html') {
+            $result['html'] = $result['html'] ?? self::toUtf8($decoded, $typeParams['charset'] ?? null);
         } else {
-            $result['text'] = $result['text'] ?? $decoded;
+            $result['text'] = $result['text'] ?? self::toUtf8($decoded, $typeParams['charset'] ?? null);
         }
+    }
+
+    /**
+     * Parse the parameters of a structured header value such as
+     * Content-Type or Content-Disposition into a lowercase-keyed array.
+     * Handles quoted values and RFC 2231 extended parameters, including
+     * charset-encoded (name*=UTF-8''%E2%9C%93.pdf) and continuation
+     * (name*0=..., name*1*=...) forms.
+     *
+     * @return array<string, string>
+     */
+    public static function parseParameters(string $value): array
+    {
+        preg_match_all(
+            '/;\s*([^=\s;]+)\s*=\s*(?:"((?:[^"\\\\]|\\\\.)*)"|([^;\s]*))/',
+            $value,
+            $matches,
+            PREG_SET_ORDER
+        );
+
+        $params = [];
+        $extended = []; // name => [section => [value, isEncoded]]
+
+        foreach ($matches as $m) {
+            $name = strtolower($m[1]);
+            $raw = isset($m[3]) && $m[3] !== '' ? $m[3] : stripslashes($m[2]);
+
+            if (preg_match('/^(.+?)(?:\*(\d+))?(\*)?$/', $name, $parts) && (isset($parts[2]) && $parts[2] !== '' || !empty($parts[3]))) {
+                $extended[$parts[1]][(int) ($parts[2] ?? 0)] = [$raw, !empty($parts[3])];
+            } else {
+                $params[$name] = $raw;
+            }
+        }
+
+        foreach ($extended as $name => $sections) {
+            ksort($sections);
+            $charset = null;
+            $decoded = '';
+
+            foreach ($sections as $index => [$raw, $isEncoded]) {
+                if ($isEncoded) {
+                    // The first encoded section carries charset'language'
+                    if ($index === array_key_first($sections) && preg_match("/^([^']*)'[^']*'(.*)$/s", $raw, $cm)) {
+                        $charset = $cm[1] ?: null;
+                        $raw = $cm[2];
+                    }
+                    $raw = rawurldecode($raw);
+                }
+                $decoded .= $raw;
+            }
+
+            // Extended parameters take precedence over plain ones
+            $params[$name] = self::toUtf8($decoded, $charset);
+        }
+
+        return $params;
+    }
+
+    /**
+     * Convert text to UTF-8 from the declared charset. With no charset
+     * (or an unknown one), invalid UTF-8 is assumed to be Windows-1252,
+     * the most common mislabelled encoding.
+     */
+    public static function toUtf8(string $text, ?string $charset): string
+    {
+        $charset = $charset !== null ? strtoupper(trim($charset)) : null;
+
+        if (in_array($charset, ['UTF-8', 'UTF8', 'US-ASCII', 'ASCII'], true) || ($charset === null && mb_check_encoding($text, 'UTF-8'))) {
+            return mb_check_encoding($text, 'UTF-8') ? $text : mb_scrub($text, 'UTF-8');
+        }
+
+        if ($charset !== null) {
+            if (in_array($charset, array_map('strtoupper', mb_list_encodings()), true)) {
+                return mb_convert_encoding($text, 'UTF-8', $charset);
+            }
+            $converted = @iconv($charset, 'UTF-8//TRANSLIT//IGNORE', $text);
+            if ($converted !== false) {
+                return $converted;
+            }
+        }
+
+        return mb_check_encoding($text, 'UTF-8') ? $text : mb_convert_encoding($text, 'UTF-8', 'Windows-1252');
     }
 
     private function decodeContent(string $content, string $encoding): string

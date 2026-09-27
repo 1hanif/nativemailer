@@ -22,6 +22,7 @@ class SmtpServer
         private string $host,
         private int $port,
         private int $timeout,
+        private int $maxMessageSize,
         /** @var callable(string $raw, ?string $from, array $recipients): void */
         private $onMessage,
     ) {}
@@ -95,6 +96,7 @@ class SmtpServer
             close: function () use ($clientId) {
                 $this->closeClient($clientId);
             },
+            maxMessageSize: $this->maxMessageSize,
         );
 
         $this->clients[$clientId] = [

@@ -22,6 +22,8 @@ Rendered inside the infolist — must NOT wrap in <x-filament-panels::page>,
             }
 
             $attachments = $email->attachments ?? [];
+            // Inline images already show inside the HTML preview
+            $stripAttachments = array_filter($attachments, fn ($att) => empty($att['inline']) || blank($email->body_html));
         @endphp
 
         {{-- Tab bar --}}
@@ -48,7 +50,7 @@ Rendered inside the infolist — must NOT wrap in <x-filament-panels::page>,
             @if (filled($email->body_html))
                 <div class="ev-panel ev-white">
                     {{-- Fully sandboxed: no scripts, no same-origin access — email HTML is untrusted --}}
-                    <iframe srcdoc="{{ $email->body_html }}" class="ev-iframe" sandbox="" title="Email Preview"></iframe>
+                    <iframe srcdoc="{{ $email->htmlWithInlineImages() }}" class="ev-iframe" sandbox="" title="Email Preview"></iframe>
                 </div>
             @elseif (filled($email->body_text))
                 <div class="ev-panel ev-white">
@@ -59,9 +61,9 @@ Rendered inside the infolist — must NOT wrap in <x-filament-panels::page>,
             @endif
 
             {{-- Attachment strip (Mailpit-style, below the message body) --}}
-            @if (count($attachments))
+            @if (count($stripAttachments))
                 <div class="ev-attach-strip">
-                    @foreach ($attachments as $att)
+                    @foreach ($stripAttachments as $att)
                         @php
                             $type = $att['content_type'] ?? 'application/octet-stream';
                             $isImage = str_starts_with($type, 'image/') && !empty($att['content']);

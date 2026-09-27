@@ -36,6 +36,33 @@ class Email extends Model
     }
 
     /**
+     * The HTML body with cid: references (inline images) swapped for
+     * data: URIs of the matching attachments, ready for the preview.
+     */
+    public function htmlWithInlineImages(): ?string
+    {
+        if (blank($this->body_html)) {
+            return $this->body_html;
+        }
+
+        $byCid = collect($this->attachments ?? [])
+            ->filter(fn (array $att) => !empty($att['content_id']) && !empty($att['content']))
+            ->mapWithKeys(fn (array $att) => [
+                strtolower($att['content_id']) => "data:{$att['content_type']};base64,{$att['content']}",
+            ]);
+
+        if ($byCid->isEmpty()) {
+            return $this->body_html;
+        }
+
+        return preg_replace_callback(
+            '/cid:([^"\'\s)>]+)/i',
+            fn (array $m) => $byCid[strtolower(rawurldecode($m[1]))] ?? $m[0],
+            $this->body_html
+        );
+    }
+
+    /**
      * Decode RFC 2047 encoded-words at display time. Covers rows that
      * were stored before the catcher decoded headers; a no-op for
      * already-decoded values.

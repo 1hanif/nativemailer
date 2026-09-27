@@ -68,7 +68,6 @@
 | **Tailwind CSS**         | 4.0     | Styling framework          |
 | **Vite**                 | 7.0     | Frontend build tool        |
 | **SQLite**               | -       | Database                   |
-| **php-mime-mail-parser** | 9.0     | Email parsing              |
 
 ---
 

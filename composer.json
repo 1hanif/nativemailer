@@ -13,7 +13,6 @@
         "laravel/tinker": "^2.10.1",
         "livewire/livewire": "^3.6",
         "nativephp/desktop": "^2.0",
-        "php-mime-mail-parser/php-mime-mail-parser": "^9.0",
         "symfony/mime": "^7.3"
     },
     "require-dev": {

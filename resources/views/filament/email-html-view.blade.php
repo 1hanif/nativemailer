@@ -21,9 +21,10 @@ Rendered inside the infolist — must NOT wrap in <x-filament-panels::page>,
                 }
             }
 
-            $attachments = $email->attachments ?? [];
+            // Metadata only: the bytes are served by AttachmentController
+            $attachments = $email->attachments()->withoutContent()->get();
             // Inline images already show inside the HTML preview
-            $stripAttachments = array_filter($attachments, fn ($att) => empty($att['inline']) || blank($email->body_html));
+            $stripAttachments = $attachments->filter(fn ($att) => !$att->inline || blank($email->body_html));
         @endphp
 
         {{-- Tab bar --}}
@@ -64,15 +65,10 @@ Rendered inside the infolist — must NOT wrap in <x-filament-panels::page>,
             @if (count($stripAttachments))
                 <div class="ev-attach-strip">
                     @foreach ($stripAttachments as $att)
-                        @php
-                            $type = $att['content_type'] ?? 'application/octet-stream';
-                            $isImage = str_starts_with($type, 'image/') && !empty($att['content']);
-                            $dataUri = !empty($att['content']) ? "data:{$type};base64,{$att['content']}" : null;
-                        @endphp
-                        <a class="ev-attach-card" @if ($dataUri) href="{{ $dataUri }}"
-                            download="{{ $att['name'] ?? 'attachment' }}" @endif>
-                            @if ($isImage)
-                                <img src="{{ $dataUri }}" alt="{{ $att['name'] ?? 'attachment' }}"
+                        <a class="ev-attach-card" href="{{ $att->url() }}?download=1"
+                            download="{{ $att->name }}">
+                            @if ($att->isImage())
+                                <img src="{{ $att->url() }}" alt="{{ $att->name }}" loading="lazy"
                                     class="ev-attach-thumb">
                             @else
                                 <span class="ev-attach-icon">
@@ -84,8 +80,8 @@ Rendered inside the infolist — must NOT wrap in <x-filament-panels::page>,
                                 </span>
                             @endif
                             <span class="ev-attach-info">
-                                <span class="ev-attach-name">{{ $att['name'] ?? 'unnamed' }}</span>
-                                <span class="ev-attach-size">{{ number_format(($att['size'] ?? 0) / 1024, 1) }}
+                                <span class="ev-attach-name">{{ $att->name }}</span>
+                                <span class="ev-attach-size">{{ number_format($att->size / 1024, 1) }}
                                     KB</span>
                             </span>
                         </a>
@@ -152,15 +148,15 @@ Rendered inside the infolist — must NOT wrap in <x-filament-panels::page>,
                     <table class="ev-headers">
                         @foreach ($attachments as $att)
                             <tr>
-                                <td class="ev-hname">{{ $att['name'] ?? 'unnamed' }}</td>
+                                <td class="ev-hname">{{ $att->name }}</td>
                                 <td class="ev-hvalue">
-                                    {{ $att['content_type'] ?? 'application/octet-stream' }}
-                                    &middot; {{ number_format(($att['size'] ?? 0) / 1024, 1) }} KB
-                                    @if (!empty($att['content']))
-                                        &middot; <a class="ev-link"
-                                            href="data:{{ $att['content_type'] ?? 'application/octet-stream' }};base64,{{ $att['content'] }}"
-                                            download="{{ $att['name'] ?? 'attachment' }}">Download</a>
+                                    {{ $att->content_type }}
+                                    &middot; {{ number_format($att->size / 1024, 1) }} KB
+                                    @if ($att->inline)
+                                        &middot; inline
                                     @endif
+                                    &middot; <a class="ev-link" href="{{ $att->url() }}?download=1"
+                                        download="{{ $att->name }}">Download</a>
                                 </td>
                             </tr>
                         @endforeach

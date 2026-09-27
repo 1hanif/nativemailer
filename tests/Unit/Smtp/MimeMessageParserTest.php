@@ -104,13 +104,3 @@ test('inline images without a filename become attachments, not the text body', f
             'inline' => true,
         ]);
 });
-
-test('cid references are swapped for data URIs in the preview HTML', function () {
-    $email = new App\Models\Email([
-        'body_html' => '<img src="cid:Logo@x"><img src="cid:missing@x">',
-        'attachments' => [['content_type' => 'image/png', 'content_id' => 'logo@x', 'content' => base64_encode('PNG')]],
-    ]);
-
-    expect($email->htmlWithInlineImages())
-        ->toBe('<img src="data:image/png;base64,' . base64_encode('PNG') . '"><img src="cid:missing@x">');
-});

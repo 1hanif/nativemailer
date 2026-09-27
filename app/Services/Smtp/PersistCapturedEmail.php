@@ -5,6 +5,7 @@ namespace App\Services\Smtp;
 use App\Events\EmailReceived;
 use App\Models\Email;
 use Exception;
+use Illuminate\Support\Facades\DB;
 use Native\Desktop\Facades\Notification;
 use Throwable;
 
@@ -29,7 +30,15 @@ class PersistCapturedEmail
         try {
             $data = $this->parser->parse($raw, $envelopeFrom, $envelopeRecipients);
 
-            $email = Email::create($data);
+            $attachments = $data['attachments'];
+            unset($data['attachments']);
+
+            $email = DB::transaction(function () use ($data, $attachments) {
+                $email = Email::create($data);
+                $email->attachments()->createMany($attachments);
+
+                return $email;
+            });
 
             // Broadcast to all windows (live inbox refresh) via EventWatcher
             event(new EmailReceived($email->id, $email->from, $email->subject));

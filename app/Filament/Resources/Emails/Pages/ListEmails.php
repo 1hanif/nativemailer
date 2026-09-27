@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Emails\Pages;
 
 use App\Events\EmailReceived;
 use App\Filament\Resources\Emails\EmailResource;
+use App\Models\Email;
 use App\Models\Setting;
 use App\Services\SmtpCatcher;
 use Filament\Actions\Action;
@@ -31,24 +32,45 @@ class ListEmails extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            Action::make('smtpSettings')
-                ->label('SMTP Settings')
+            Action::make('settings')
+                ->label('Settings')
                 ->icon('heroicon-o-cog-6-tooth')
-                ->modalHeading('SMTP Catcher Settings')
+                ->modalHeading('Settings')
                 ->modalDescription(fn (): string => self::catcherStatus())
-                ->modalSubmitActionLabel('Save & restart catcher')
-                ->fillForm(fn (): array => ['port' => SmtpCatcher::port()])
+                ->modalSubmitActionLabel('Save')
+                ->fillForm(fn (): array => [
+                    'port' => SmtpCatcher::port(),
+                    'retention_days' => (int) Setting::get('retention_days', 0) ?: null,
+                    'retention_max_emails' => (int) Setting::get('retention_max_emails', 0) ?: null,
+                ])
                 ->schema([
-                    TextInput::make('port')
-                        ->label('SMTP port')
-                        ->numeric()
-                        ->required()
-                        ->minValue(1024)
-                        ->maxValue(65535)
-                        ->helperText(
-                            'Apps that send mail here must use this as MAIL_PORT. '
-                                . 'Saving restarts the catcher (~2s downtime); mail sent during the restart is refused, not queued.'
-                        ),
+                    Section::make('SMTP catcher')->schema([
+                        TextInput::make('port')
+                            ->label('SMTP port')
+                            ->numeric()
+                            ->required()
+                            ->minValue(1024)
+                            ->maxValue(65535)
+                            ->helperText(
+                                'Apps that send mail here must use this as MAIL_PORT. '
+                                    . 'Changing it restarts the catcher (~2s downtime); mail sent during the restart is refused, not queued.'
+                            ),
+                    ]),
+                    Section::make('Retention')
+                        ->description('Older emails are deleted automatically every hour. Leave both empty to keep everything.')
+                        ->columns(2)
+                        ->schema([
+                            TextInput::make('retention_days')
+                                ->label('Delete emails older than')
+                                ->numeric()
+                                ->minValue(1)
+                                ->suffix('days'),
+                            TextInput::make('retention_max_emails')
+                                ->label('Keep at most')
+                                ->numeric()
+                                ->minValue(1)
+                                ->suffix('emails'),
+                        ]),
                 ])
                 ->action(function (array $data): void {
                     $newPort = (int) $data['port'];
@@ -66,16 +88,47 @@ class ListEmails extends ListRecords
                         return;
                     }
 
-                    Setting::set('smtp_port', $newPort);
-                    ChildProcess::restart('smtp-catcher');
+                    Setting::set('retention_days', (int) ($data['retention_days'] ?? 0));
+                    Setting::set('retention_max_emails', (int) ($data['retention_max_emails'] ?? 0));
+                    $pruned = Email::pruneNow();
 
-                    Notification::make()
-                        ->title("SMTP catcher restarting on port {$newPort}")
-                        ->body($newPort !== $currentPort
-                            ? "Update MAIL_PORT={$newPort} in every app that sends mail here — they still point at {$currentPort}."
-                            : 'Port unchanged; catcher restarted.')
-                        ->success()
-                        ->send();
+                    $body = $pruned > 0 ? "Deleted {$pruned} emails outside the retention limits." : null;
+
+                    if ($newPort !== $currentPort) {
+                        Setting::set('smtp_port', $newPort);
+                        ChildProcess::restart('smtp-catcher');
+
+                        Notification::make()
+                            ->title("SMTP catcher restarting on port {$newPort}")
+                            ->body(trim("Update MAIL_PORT={$newPort} in every app that sends mail here — they still point at {$currentPort}. " . $body))
+                            ->success()
+                            ->send();
+
+                        return;
+                    }
+
+                    Notification::make()->title('Settings saved')->body($body)->success()->send();
+                }),
+
+            Action::make('deleteAll')
+                ->label('Delete all')
+                ->icon('heroicon-o-trash')
+                ->color('danger')
+                ->requiresConfirmation()
+                ->modalHeading('Delete all emails?')
+                ->modalDescription('Every captured email and attachment will be permanently deleted.')
+                ->modalSubmitActionLabel('Delete all')
+                ->hidden(fn (): bool => !Email::query()->exists())
+                ->action(function (): void {
+                    $count = Email::query()->delete(); // attachments cascade
+
+                    // Hand the freed pages back to the OS; SQLite keeps them otherwise.
+                    // VACUUM can't run inside a transaction (e.g. under tests).
+                    if (DB::transactionLevel() === 0) {
+                        DB::statement('VACUUM');
+                    }
+
+                    Notification::make()->title("Deleted {$count} emails")->success()->send();
                 }),
         ];
     }

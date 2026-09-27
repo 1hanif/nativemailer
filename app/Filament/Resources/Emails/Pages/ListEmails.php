@@ -11,6 +11,8 @@ use Filament\Actions\Action;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
+use Filament\Schemas\Components\Section;
+use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\On;
 use Native\Desktop\Facades\ChildProcess;
 

@@ -50,8 +50,11 @@ class EmailsTable
                     ->searchable(['subject', 'body_text', 'body_html']),
                 IconColumn::make('attachments_exists')
                     ->label('')
-                    ->icon(fn (bool $state) => $state ? 'heroicon-o-paper-clip' : null)
-                    ->tooltip(fn (bool $state) => $state ? 'Has attachments' : null)
+                    // null (not false) when there are none: a false state makes
+                    // IconColumn draw its boolean "no" icon
+                    ->state(fn (Email $record): ?bool => $record->attachments_exists ?: null)
+                    ->icon('heroicon-o-paper-clip')
+                    ->tooltip(fn (Email $record): ?string => $record->attachments_exists ? 'Has attachments' : null)
                     ->color('gray'),
                 TextColumn::make('received_at')
                     ->weight($unreadWeight)

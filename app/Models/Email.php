@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\UnreadBadge;
 use App\Support\MimeHeader;
 use App\Support\PreviewLinks;
 use Illuminate\Database\Eloquent\Builder;
@@ -34,6 +35,14 @@ class Email extends Model
         'received_at' => 'datetime',
         'is_read' => 'boolean',
     ];
+
+    protected static function booted(): void
+    {
+        // Mass updates/deletes (Delete all, pruning) call UnreadBadge::sync() themselves
+        static::created(fn () => UnreadBadge::sync());
+        static::updated(fn (Email $email) => $email->wasChanged('is_read') && UnreadBadge::sync());
+        static::deleted(fn () => UnreadBadge::sync());
+    }
 
     public function attachments(): HasMany
     {
@@ -71,7 +80,10 @@ class Email extends Model
      */
     public static function pruneNow(): int
     {
-        return (new static)->pruneAll();
+        $pruned = (new static)->pruneAll();
+        UnreadBadge::sync();
+
+        return $pruned;
     }
 
     public function markAsRead(): void

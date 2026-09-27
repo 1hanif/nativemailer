@@ -6,13 +6,17 @@ use App\Events\EmailReceived;
 use App\Filament\Resources\Emails\EmailResource;
 use App\Models\Email;
 use App\Models\Setting;
+use App\Services\CatcherStatus;
 use App\Services\SmtpCatcher;
+use App\Services\UnreadBadge;
 use Filament\Actions\Action;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Schemas\Components\Section;
+use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\HtmlString;
 use Livewire\Attributes\On;
 use Native\Desktop\Facades\ChildProcess;
 
@@ -80,7 +84,7 @@ class ListEmails extends ListRecords
 
                     // Reject a port something else is already listening on.
                     // (The current port is legitimately "in use" — by the catcher.)
-                    if ($newPort !== $currentPort && self::portInUse($newPort)) {
+                    if ($newPort !== $currentPort && CatcherStatus::portInUse($newPort)) {
                         Notification::make()
                             ->title("Port {$newPort} is already in use")
                             ->body('Another process is listening on it. Pick a different port.')
@@ -123,6 +127,7 @@ class ListEmails extends ListRecords
                 ->hidden(fn (): bool => ! Email::query()->exists())
                 ->action(function (): void {
                     $count = Email::query()->delete(); // attachments cascade
+                    UnreadBadge::sync();
 
                     // Hand the freed pages back to the OS; SQLite keeps them otherwise.
                     // VACUUM can't run inside a transaction (e.g. under tests).
@@ -135,24 +140,26 @@ class ListEmails extends ListRecords
         ];
     }
 
-    private static function catcherStatus(): string
+    /** Always-visible catcher status under the page title */
+    public function getSubheading(): string|Htmlable|null
     {
-        $port = SmtpCatcher::port();
+        $status = CatcherStatus::check();
+        $color = match ($status['state']) {
+            CatcherStatus::RUNNING => 'success',
+            CatcherStatus::PORT_TAKEN => 'warning',
+            default => 'danger',
+        };
 
-        return self::portInUse($port)
-            ? "🟢 Catcher is listening on 127.0.0.1:{$port}"
-            : "🔴 Nothing is listening on 127.0.0.1:{$port} — the catcher may be down or still restarting.";
+        return new HtmlString(
+            '<span class="catcher-status" data-state="'.e($status['state']).'" style="display:inline-flex;align-items:center;gap:.5rem">'
+            .'<span style="width:.55rem;height:.55rem;border-radius:9999px;background:var(--'.$color.'-500)"></span>'
+            .e($status['message'])
+            .'</span>'
+        );
     }
 
-    private static function portInUse(int $port): bool
+    private static function catcherStatus(): string
     {
-        $conn = @fsockopen('127.0.0.1', $port, $errno, $errstr, 0.3);
-        if ($conn !== false) {
-            fclose($conn);
-
-            return true;
-        }
-
-        return false;
+        return CatcherStatus::check()['message'];
     }
 }

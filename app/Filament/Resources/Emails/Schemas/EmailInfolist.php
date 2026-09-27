@@ -15,6 +15,13 @@ class EmailInfolist
                     ->placeholder('-'),
                 TextEntry::make('to')
                     ->placeholder('-'),
+                TextEntry::make('cc')
+                    ->label('CC')
+                    ->visible(fn ($record) => filled($record->cc)),
+                TextEntry::make('bcc')
+                    ->label('BCC')
+                    ->helperText('Envelope recipients not listed in To or CC')
+                    ->visible(fn ($record) => filled($record->bcc)),
                 TextEntry::make('subject')
                     ->placeholder('-'),
                 TextEntry::make('received_at')

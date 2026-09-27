@@ -7,7 +7,7 @@
 ### A Modern Desktop Email Testing Application
 
 <p align="center">
-  <img src="https://img.shields.io/badge/PHP-8.2+-777BB4?style=for-the-badge&logo=php&logoColor=white" alt="PHP">
+  <img src="https://img.shields.io/badge/PHP-8.4+-777BB4?style=for-the-badge&logo=php&logoColor=white" alt="PHP">
   <img src="https://img.shields.io/badge/Laravel-12-FF2D20?style=for-the-badge&logo=laravel&logoColor=white" alt="Laravel">
   <img src="https://img.shields.io/badge/Filament-4.0-FDAE4B?style=for-the-badge" alt="Filament">
   <img src="https://img.shields.io/badge/NativePHP-2.0-00D1B2?style=for-the-badge" alt="NativePHP">
@@ -60,7 +60,7 @@
 
 | Technology               | Version | Purpose                    |
 | ------------------------ | ------- | -------------------------- |
-| **PHP**                  | 8.2+    | Core language              |
+| **PHP**                  | 8.4+    | Core language              |
 | **Laravel**              | 12.0    | Application framework      |
 | **Filament**             | 4.0     | Admin panel framework      |
 | **NativePHP Desktop**    | 2.0     | Native application wrapper |
@@ -76,7 +76,7 @@
 
 Before you begin, ensure your system meets these requirements:
 
--   **PHP** 8.2 or higher
+-   **PHP** 8.4 or higher
 -   **Composer** (latest version recommended)
 -   **Node.js** 18+ and npm
 -   **SQLite** (usually included with PHP)

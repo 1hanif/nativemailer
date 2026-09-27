@@ -23,3 +23,4 @@ Homestead.json
 Homestead.yaml
 Thumbs.db
 ./send_test_email.py
+/docs

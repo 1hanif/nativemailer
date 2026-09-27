@@ -31,6 +31,7 @@ class EmailsTable
                 ->select(Email::LIST_COLUMNS)
                 ->withExists('attachments'))
             ->defaultSort('received_at', 'desc')
+            ->searchPlaceholder('Search people, subject or body')
             ->columns([
                 TextColumn::make('is_read')
                     ->label('')
@@ -42,10 +43,11 @@ class EmailsTable
                     ->searchable(),
                 TextColumn::make('to')
                     ->weight($unreadWeight)
-                    ->searchable(),
+                    ->searchable(['to', 'cc', 'bcc']),
                 TextColumn::make('subject')
                     ->weight($unreadWeight)
-                    ->searchable(),
+                    // Also matches the message body, not just the subject line
+                    ->searchable(['subject', 'body_text', 'body_html']),
                 IconColumn::make('attachments_exists')
                     ->label('')
                     ->icon(fn (bool $state) => $state ? 'heroicon-o-paper-clip' : null)

@@ -1,5 +1,8 @@
 <?php
 
+use App\Models\Email as CapturedEmail;
+use App\Services\ReleaseEmail;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Symfony\Component\Mailer\Envelope;
 use Symfony\Component\Mailer\Exception\UnexpectedResponseException;
 use Symfony\Component\Mailer\Transport;
@@ -14,6 +17,8 @@ use Symfony\Component\Process\Process;
  * the same client Laravel apps use — to cover the full path from TCP to
  * the database.
  */
+
+uses(RefreshDatabase::class);
 
 beforeEach(function () {
     $this->dbPath = tempnam(sys_get_temp_dir(), 'catcher').'.sqlite';
@@ -108,4 +113,30 @@ test('messages over SMTP_CATCHER_MAX_SIZE are refused and not stored', function 
         ->toThrow(UnexpectedResponseException::class, '552');
 
     expect($this->db->query('select count(*) from emails')->fetchColumn())->toBe(0);
+});
+
+test('Release forwards the original message through a relay, unchanged', function () {
+    $raw = file_get_contents(base_path('tests/Fixtures/emails/symfony-mailable.eml'));
+    $email = CapturedEmail::create(['from' => 'orders@shop.test', 'raw' => str_replace(["\r\n", "\n"], ["\n", "\r\n"], rtrim($raw))]);
+
+    // The relay is a second, real catcher: whatever arrives there is what a real inbox would get
+    ReleaseEmail::saveSettings([
+        'relay_host' => '127.0.0.1',
+        'relay_port' => $this->port,
+        'relay_encryption' => ReleaseEmail::ENCRYPTION_NONE,
+        'relay_username' => 'relay-user',
+        'relay_password' => 'relay-secret',
+    ]);
+
+    ReleaseEmail::send($email, ['qa@team.test']);
+
+    $released = $this->db->query('select "from", "to", bcc, subject, raw from emails')->fetch(PDO::FETCH_ASSOC);
+    expect($released)
+        ->subject->toBe('Your order #1042 🚀 is confirmed')
+        ->from->toBe('orders@shop.test')
+        // headers untouched: still addressed to the original recipients...
+        ->to->toBe('jane@x.test, ops@x.test')
+        // ...while the envelope delivered it to the release target
+        ->bcc->toBe('qa@team.test')
+        ->and(str_replace("\r\n", "\n", $released['raw']))->toBe(str_replace("\r\n", "\n", rtrim($raw)));
 });

@@ -7,9 +7,11 @@ use App\Filament\Resources\Emails\EmailResource;
 use App\Models\Email;
 use App\Models\Setting;
 use App\Services\CatcherStatus;
+use App\Services\ReleaseEmail;
 use App\Services\SmtpCatcher;
 use App\Services\UnreadBadge;
 use Filament\Actions\Action;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
@@ -48,6 +50,11 @@ class ListEmails extends ListRecords
                     'port' => SmtpCatcher::port(),
                     'retention_days' => (int) Setting::get('retention_days', 0) ?: null,
                     'retention_max_emails' => (int) Setting::get('retention_max_emails', 0) ?: null,
+                    'relay_host' => ReleaseEmail::settings()['host'],
+                    'relay_port' => ReleaseEmail::settings()['port'],
+                    'relay_encryption' => ReleaseEmail::settings()['encryption'],
+                    'relay_username' => ReleaseEmail::settings()['username'],
+                    'relay_from' => ReleaseEmail::settings()['from'],
                 ])
                 ->schema([
                     Section::make('SMTP catcher')->schema([
@@ -77,6 +84,35 @@ class ListEmails extends ListRecords
                                 ->minValue(1)
                                 ->suffix('emails'),
                         ]),
+                    Section::make('Release relay')
+                        ->description('A real SMTP server used by "Release" to forward a captured email to a real inbox. Leave the host empty to turn Release off.')
+                        ->columns(2)
+                        ->collapsed(fn (): bool => ! ReleaseEmail::isConfigured())
+                        ->schema([
+                            TextInput::make('relay_host')->label('Host')->placeholder('smtp.example.com'),
+                            TextInput::make('relay_port')->label('Port')->numeric()->minValue(1)->maxValue(65535)->default(587),
+                            Select::make('relay_encryption')
+                                ->label('Encryption')
+                                ->options([
+                                    ReleaseEmail::ENCRYPTION_STARTTLS => 'STARTTLS (usually port 587)',
+                                    ReleaseEmail::ENCRYPTION_TLS => 'TLS (usually port 465)',
+                                    ReleaseEmail::ENCRYPTION_NONE => 'None',
+                                ])
+                                ->default(ReleaseEmail::ENCRYPTION_STARTTLS)
+                                ->selectablePlaceholder(false),
+                            TextInput::make('relay_from')
+                                ->label('Envelope sender')
+                                ->email()
+                                ->placeholder('Original sender')
+                                ->helperText('Some relays only accept mail from verified addresses.'),
+                            TextInput::make('relay_username')->label('Username')->autocomplete('off'),
+                            TextInput::make('relay_password')
+                                ->label('Password')
+                                ->password()
+                                ->revealable()
+                                ->autocomplete('new-password')
+                                ->placeholder(fn (): string => Setting::get('relay_password') ? 'Saved (leave blank to keep)' : ''),
+                        ]),
                 ])
                 ->action(function (array $data): void {
                     $newPort = (int) $data['port'];
@@ -94,6 +130,7 @@ class ListEmails extends ListRecords
                         return;
                     }
 
+                    ReleaseEmail::saveSettings($data);
                     Setting::set('retention_days', (int) ($data['retention_days'] ?? 0));
                     Setting::set('retention_max_emails', (int) ($data['retention_max_emails'] ?? 0));
                     $pruned = Email::pruneNow();

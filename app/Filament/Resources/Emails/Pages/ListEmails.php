@@ -25,7 +25,7 @@ class ListEmails extends ListRecords
      * NativePHP's EventWatcher broadcasts EmailReceived to every window,
      * where it arrives as a Livewire event named with a leading backslash.
      */
-    #[On('native:\\' . EmailReceived::class)]
+    #[On('native:\\'.EmailReceived::class)]
     public function onEmailReceived(): void
     {
         // Empty on purpose: receiving the event triggers a re-render.
@@ -55,7 +55,7 @@ class ListEmails extends ListRecords
                             ->maxValue(65535)
                             ->helperText(
                                 'Apps that send mail here must use this as MAIL_PORT. '
-                                    . 'Changing it restarts the catcher (~2s downtime); mail sent during the restart is refused, not queued.'
+                                    .'Changing it restarts the catcher (~2s downtime); mail sent during the restart is refused, not queued.'
                             ),
                     ]),
                     Section::make('Retention')
@@ -102,7 +102,7 @@ class ListEmails extends ListRecords
 
                         Notification::make()
                             ->title("SMTP catcher restarting on port {$newPort}")
-                            ->body(trim("Update MAIL_PORT={$newPort} in every app that sends mail here — they still point at {$currentPort}. " . $body))
+                            ->body(trim("Update MAIL_PORT={$newPort} in every app that sends mail here — they still point at {$currentPort}. ".$body))
                             ->success()
                             ->send();
 
@@ -120,7 +120,7 @@ class ListEmails extends ListRecords
                 ->modalHeading('Delete all emails?')
                 ->modalDescription('Every captured email and attachment will be permanently deleted.')
                 ->modalSubmitActionLabel('Delete all')
-                ->hidden(fn (): bool => !Email::query()->exists())
+                ->hidden(fn (): bool => ! Email::query()->exists())
                 ->action(function (): void {
                     $count = Email::query()->delete(); // attachments cascade
 

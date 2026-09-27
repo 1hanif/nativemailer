@@ -5,8 +5,8 @@ namespace App\Filament\Resources\Emails\Tables;
 use App\Models\Email;
 use Filament\Actions\BulkAction;
 use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\DeleteAction;
+use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\ViewAction;
 use Filament\Support\Enums\FontWeight;
 use Filament\Tables\Columns\IconColumn;
@@ -26,6 +26,10 @@ class EmailsTable
             // Live refresh comes from the EmailReceived event (see ListEmails);
             // this slow poll is only a fallback, e.g. in a plain browser
             ->poll('30s')
+            // Skip body/raw columns: the list only needs headers
+            ->modifyQueryUsing(fn (Builder $query) => $query
+                ->select(Email::LIST_COLUMNS)
+                ->withExists('attachments'))
             ->defaultSort('received_at', 'desc')
             ->columns([
                 TextColumn::make('is_read')

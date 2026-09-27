@@ -22,7 +22,7 @@ use Throwable;
 class PersistCapturedEmail
 {
     public function __construct(
-        private MimeMessageParser $parser = new MimeMessageParser(),
+        private MimeMessageParser $parser = new MimeMessageParser,
     ) {}
 
     public function __invoke(string $raw, ?string $envelopeFrom, array $envelopeRecipients): void
@@ -46,9 +46,9 @@ class PersistCapturedEmail
             $this->notify($email);
         } catch (Exception $e) {
             error_log(
-                '[' . date('Y-m-d H:i:s') . "] Failed to handle email: " . $e->getMessage()
-                    . "\nTrace: " . $e->getTraceAsString()
-                    . "\nRaw message: " . substr($raw, 0, 1000) . "\n",
+                '['.date('Y-m-d H:i:s').'] Failed to handle email: '.$e->getMessage()
+                    ."\nTrace: ".$e->getTraceAsString()
+                    ."\nRaw message: ".substr($raw, 0, 1000)."\n",
                 3,
                 storage_path('logs/smtp.log')
             );
@@ -59,14 +59,14 @@ class PersistCapturedEmail
     {
         try {
             Notification::new()
-                ->reference('email:' . $email->id)
+                ->reference('email:'.$email->id)
                 ->title($email->subject ?: 'New email')
-                ->message('From: ' . ($email->from ?? 'unknown'))
+                ->message('From: '.($email->from ?? 'unknown'))
                 ->show();
         } catch (Throwable $e) {
             // A failed notification must never break email capture
             error_log(
-                '[' . date('Y-m-d H:i:s') . '] Notification failed: ' . $e->getMessage() . "\n",
+                '['.date('Y-m-d H:i:s').'] Notification failed: '.$e->getMessage()."\n",
                 3,
                 storage_path('logs/smtp.log')
             );

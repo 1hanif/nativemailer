@@ -9,3 +9,6 @@
 /.github export-ignore
 CHANGELOG.md export-ignore
 .styleci.yml export-ignore
+
+# Keep fixture emails byte-for-byte (CRLF line endings matter)
+*.eml -text

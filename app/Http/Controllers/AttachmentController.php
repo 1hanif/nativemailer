@@ -17,7 +17,7 @@ class AttachmentController extends Controller
      */
     public function show(Request $request, EmailAttachment $attachment): Response
     {
-        $inline = $attachment->isImage() && !$request->boolean('download');
+        $inline = $attachment->isImage() && ! $request->boolean('download');
 
         return response($attachment->content, 200, [
             'Content-Type' => $attachment->content_type,

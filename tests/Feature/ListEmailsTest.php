@@ -13,7 +13,7 @@ test('the inbox shows a newly captured email when EmailReceived arrives', functi
 
     $email = Email::create(['from' => 'a@x.test', 'to' => 'b@x.test', 'subject' => 'Fresh arrival']);
 
-    $page->dispatch('native:\\' . EmailReceived::class, id: $email->id)
+    $page->dispatch('native:\\'.EmailReceived::class, id: $email->id)
         ->assertSee('Fresh arrival');
 });
 

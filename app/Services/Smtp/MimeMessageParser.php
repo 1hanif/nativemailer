@@ -26,7 +26,7 @@ class MimeMessageParser
         $rawMessage = str_replace("\n", "\r\n", $rawMessage);
 
         if (strpos($rawMessage, "\r\n\r\n") !== false) {
-            list($headerString, $bodyString) = explode("\r\n\r\n", $rawMessage, 2);
+            [$headerString, $bodyString] = explode("\r\n\r\n", $rawMessage, 2);
         } else {
             $headerString = $rawMessage;
             $bodyString = '';
@@ -50,7 +50,7 @@ class MimeMessageParser
         $visible = array_map('strtolower', [...$toEmails, ...$ccEmails]);
         $bccEmails = array_values(array_unique(array_filter(
             $envelopeRecipients,
-            fn (string $rcpt) => !in_array(strtolower($rcpt), $visible, true)
+            fn (string $rcpt) => ! in_array(strtolower($rcpt), $visible, true)
         )));
 
         $result = ['text' => null, 'html' => null, 'attachments' => []];
@@ -112,18 +112,20 @@ class MimeMessageParser
             $char = $header[$i];
 
             if ($char === '\\' && $inQuotes && $i + 1 < $length) {
-                $current .= $char . $header[++$i];
+                $current .= $char.$header[++$i];
+
                 continue;
             }
             if ($char === '"') {
-                $inQuotes = !$inQuotes;
-            } elseif (!$inQuotes && $char === '<') {
+                $inQuotes = ! $inQuotes;
+            } elseif (! $inQuotes && $char === '<') {
                 $inAngle = true;
-            } elseif (!$inQuotes && $char === '>') {
+            } elseif (! $inQuotes && $char === '>') {
                 $inAngle = false;
-            } elseif ($char === ',' && !$inQuotes && !$inAngle) {
+            } elseif ($char === ',' && ! $inQuotes && ! $inAngle) {
                 $parts[] = $current;
                 $current = '';
+
                 continue;
             }
             $current .= $char;
@@ -175,7 +177,7 @@ class MimeMessageParser
 
         if (preg_match('/multipart\/[a-z-]+.*boundary=(?:"([^"]+)"|([^;\s]+))/is', $contentType, $m)) {
             $boundary = $m[1] !== '' ? $m[1] : $m[2];
-            $parts = preg_split('/\r\n--' . preg_quote($boundary, '/') . '/', "\r\n" . $body);
+            $parts = preg_split('/\r\n--'.preg_quote($boundary, '/').'/', "\r\n".$body);
 
             foreach ($parts as $i => $part) {
                 if ($i === 0) {
@@ -187,7 +189,7 @@ class MimeMessageParser
                 }
 
                 if (strpos($part, "\r\n\r\n") !== false) {
-                    list($partHeaderString, $partBody) = explode("\r\n\r\n", $part, 2);
+                    [$partHeaderString, $partBody] = explode("\r\n\r\n", $part, 2);
                 } else {
                     $partHeaderString = $part;
                     $partBody = '';
@@ -204,7 +206,7 @@ class MimeMessageParser
         $mimeType = strtolower(trim(explode(';', $contentType)[0]));
         $typeParams = self::parseParameters($contentType);
         $filename = self::parseParameters($disposition)['filename'] ?? $typeParams['name'] ?? null;
-        $contentId = isset($headers['content-id']) ? trim($headers['content-id'], " <>") : null;
+        $contentId = isset($headers['content-id']) ? trim($headers['content-id'], ' <>') : null;
 
         $decoded = $this->decodeContent($body, $headers['content-transfer-encoding'] ?? '');
 
@@ -212,7 +214,7 @@ class MimeMessageParser
             && $filename === null
             && stripos($disposition, 'attachment') === false;
 
-        if (!$isBody) {
+        if (! $isBody) {
             // Anything that isn't a plain/HTML body is kept as an attachment,
             // including inline images referenced from the HTML via cid:
             $result['attachments'][] = [
@@ -255,8 +257,8 @@ class MimeMessageParser
             $name = strtolower($m[1]);
             $raw = isset($m[3]) && $m[3] !== '' ? $m[3] : stripslashes($m[2]);
 
-            if (preg_match('/^(.+?)(?:\*(\d+))?(\*)?$/', $name, $parts) && (isset($parts[2]) && $parts[2] !== '' || !empty($parts[3]))) {
-                $extended[$parts[1]][(int) ($parts[2] ?? 0)] = [$raw, !empty($parts[3])];
+            if (preg_match('/^(.+?)(?:\*(\d+))?(\*)?$/', $name, $parts) && (isset($parts[2]) && $parts[2] !== '' || ! empty($parts[3]))) {
+                $extended[$parts[1]][(int) ($parts[2] ?? 0)] = [$raw, ! empty($parts[3])];
             } else {
                 $params[$name] = $raw;
             }

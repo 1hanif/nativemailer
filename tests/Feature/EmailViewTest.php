@@ -30,7 +30,7 @@ test('cid references point at the attachment URL, case-insensitively', function 
     $logo = $email->attachments()->where('name', 'logo.png')->first();
 
     expect($email->htmlWithInlineImages())
-        ->toBe('<p><img src="' . $logo->url() . '"><img src="cid:missing@x"></p>');
+        ->toBe('<p><img src="'.$logo->url().'"><img src="cid:missing@x"></p>');
 });
 
 test('the view page links attachments instead of embedding them', function () {
@@ -40,7 +40,7 @@ test('the view page links attachments instead of embedding them', function () {
     $html = $this->get("/admin/emails/{$email->id}")->assertOk()->getContent();
 
     expect($html)
-        ->toContain('srcdoc="&lt;p&gt;&lt;img src=&quot;' . e($logo->url()))
+        ->toContain('srcdoc="&lt;p&gt;&lt;img src=&quot;'.e($logo->url()))
         ->not->toContain('base64,')
         ->toContain('secret@x.test')
         ->toContain('c@x.test')

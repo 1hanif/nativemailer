@@ -26,7 +26,7 @@ class SmtpCatcher
             port: self::port(),
             timeout: (int) config('mail.catcher.timeout', 30),
             maxMessageSize: (int) config('mail.catcher.max_size', 50 * 1024 * 1024),
-            onMessage: new PersistCapturedEmail(),
+            onMessage: new PersistCapturedEmail,
         );
     }
 

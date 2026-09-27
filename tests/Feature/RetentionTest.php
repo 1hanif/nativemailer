@@ -4,6 +4,7 @@ use App\Filament\Resources\Emails\Pages\ListEmails;
 use App\Models\Email;
 use App\Models\EmailAttachment;
 use App\Models\Setting;
+use App\Services\SmtpCatcher;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 
@@ -34,7 +35,7 @@ test('emails older than retention_days are pruned with their attachments', funct
 
 test('only the newest retention_max_emails are kept', function () {
     foreach (range(1, 5) as $i) {
-        emailReceived("mail {$i}", (10 - $i) . ' minutes');
+        emailReceived("mail {$i}", (10 - $i).' minutes');
     }
     Setting::set('retention_max_emails', 2);
 
@@ -66,7 +67,7 @@ test('saving retention settings prunes immediately without restarting the catche
     emailReceived('new', '1 day');
 
     Livewire::test(ListEmails::class)
-        ->callAction('settings', data: ['port' => App\Services\SmtpCatcher::port(), 'retention_days' => 7]);
+        ->callAction('settings', data: ['port' => SmtpCatcher::port(), 'retention_days' => 7]);
 
     expect(Setting::get('retention_days'))->toBe('7')
         ->and(Email::pluck('subject')->all())->toBe(['new']);

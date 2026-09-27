@@ -129,6 +129,8 @@ return [
         'host' => env('SMTP_CATCHER_HOST', '127.0.0.1'),
         'port' => env('SMTP_CATCHER_PORT', 1025),
         'timeout' => env('SMTP_CATCHER_TIMEOUT', 30),
+        // Largest message accepted, in bytes; bigger ones are refused with 552
+        'max_size' => env('SMTP_CATCHER_MAX_SIZE', 50 * 1024 * 1024),
     ],
 
 ];

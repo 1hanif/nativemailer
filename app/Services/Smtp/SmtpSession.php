@@ -22,11 +22,17 @@ class SmtpSession
      */
     private const EXTENSIONS = ['AUTH PLAIN LOGIN', '8BITMIME', 'SMTPUTF8'];
 
+    /** Longest command line accepted outside DATA (RFC 5321 §4.5.3.1.4 is 512) */
+    private const MAX_COMMAND_LINE = 4096;
+
     private string $state = self::STATE_HELO;
     private string $buffer = '';
     private string $raw = '';
     private ?string $mailFrom = null;
     private array $recipients = [];
+
+    /** Set once the current message passes maxMessageSize; the rest is discarded */
+    private bool $tooLarge = false;
 
     /**
      * Pending AUTH exchange: null when idle, otherwise the next thing we
@@ -41,6 +47,7 @@ class SmtpSession
         private $onMessage,
         /** @var callable(): void */
         private $close,
+        private int $maxMessageSize = 50 * 1024 * 1024,
     ) {}
 
     public function greet(): void
@@ -70,17 +77,44 @@ class SmtpSession
                 return; // connection closed (QUIT)
             }
         }
+
+        $this->guardUnterminatedLine();
+    }
+
+    /**
+     * Stop a client from growing the buffer without ever sending CRLF.
+     * In DATA the partial line is dropped (the message is already too
+     * big); keep the last byte in case it is the "\r" of the next CRLF.
+     */
+    private function guardUnterminatedLine(): void
+    {
+        if ($this->state === self::STATE_DATA_BODY && strlen($this->buffer) > $this->maxMessageSize) {
+            $this->tooLarge = true;
+            $this->raw = '';
+            $this->buffer = substr($this->buffer, -1);
+        } elseif ($this->state !== self::STATE_DATA_BODY && strlen($this->buffer) > self::MAX_COMMAND_LINE) {
+            $this->buffer = '';
+            $this->reply("500 5.5.6 Line too long\r\n");
+        }
     }
 
     /** In DATA, everything is message content until the terminating "." */
     private function handleBodyLine(string $line): void
     {
         if ($line === '.') {
-            ($this->onMessage)($this->raw, $this->mailFrom, $this->recipients);
-            $this->reply("250 OK: Message accepted\r\n");
+            if ($this->tooLarge) {
+                $this->reply("552 5.3.4 Message exceeds fixed maximum message size of {$this->maxMessageSize} bytes\r\n");
+            } else {
+                ($this->onMessage)($this->raw, $this->mailFrom, $this->recipients);
+                $this->reply("250 OK: Message accepted\r\n");
+            }
             $this->resetTransaction(self::STATE_MAIL);
 
             return;
+        }
+
+        if ($this->tooLarge) {
+            return; // keep reading until "." but don't store anything
         }
 
         // Reverse SMTP dot-stuffing (RFC 5321 §4.5.2)
@@ -88,6 +122,11 @@ class SmtpSession
             $line = substr($line, 1);
         }
         $this->raw .= $line . "\r\n";
+
+        if (strlen($this->raw) > $this->maxMessageSize) {
+            $this->tooLarge = true;
+            $this->raw = ''; // free the memory now
+        }
     }
 
     /** @return bool false when the connection was closed */
@@ -96,7 +135,7 @@ class SmtpSession
         $upper = strtoupper($line);
 
         if (preg_match('/^EHLO\b/i', $line)) {
-            $lines = ['localhost', ...self::EXTENSIONS];
+            $lines = ['localhost', "SIZE {$this->maxMessageSize}", ...self::EXTENSIONS];
             $last = array_pop($lines);
             $this->reply(implode('', array_map(fn ($l) => "250-{$l}\r\n", $lines)) . "250 {$last}\r\n");
             $this->resetTransaction(self::STATE_MAIL);
@@ -108,6 +147,9 @@ class SmtpSession
         } elseif (preg_match('/^MAIL FROM:\s*(.*)/i', $line, $m)) {
             if ($this->state === self::STATE_HELO) {
                 $this->reply("503 5.5.1 Send HELO/EHLO first\r\n");
+            } elseif (preg_match('/\bSIZE=(\d+)/i', $m[1], $size) && (int) $size[1] > $this->maxMessageSize) {
+                // Client declared the size up front (RFC 1870): refuse early
+                $this->reply("552 5.3.4 Message size exceeds fixed maximum message size\r\n");
             } else {
                 $this->mailFrom = MimeMessageParser::extractAddress($m[1]);
                 $this->recipients = [];
@@ -192,6 +234,7 @@ class SmtpSession
     {
         $this->state = $state;
         $this->raw = '';
+        $this->tooLarge = false;
         $this->mailFrom = null;
         $this->recipients = [];
     }

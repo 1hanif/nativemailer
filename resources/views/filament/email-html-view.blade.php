@@ -25,6 +25,9 @@ Rendered inside the infolist — must NOT wrap in <x-filament-panels::page>,
             $attachments = $email->attachments()->withoutContent()->get();
             // Inline images already show inside the HTML preview
             $stripAttachments = $attachments->filter(fn ($att) => !$att->inline || blank($email->body_html));
+
+            $checks = \App\Services\EmailChecks::run($email);
+            $checkErrors = count(array_filter($checks, fn ($c) => $c['level'] === \App\Services\EmailChecks::ERROR));
         @endphp
 
         {{-- Tab bar --}}
@@ -43,6 +46,11 @@ Rendered inside the infolist — must NOT wrap in <x-filament-panels::page>,
                 :class="{ 'ev-active': tab === 'attachments' }">
                 Attachments <span class="ev-badge">{{ count($attachments) }}</span>
             </button>
+            @if (filled($email->body_html))
+                <button type="button" role="tab" @click="tab = 'checks'" :class="{ 'ev-active': tab === 'checks' }">
+                    Checks <span @class(['ev-badge', 'ev-badge-error' => $checkErrors, 'ev-badge-ok' => ! count($checks)])>{{ count($checks) ?: '✓' }}</span>
+                </button>
+            @endif
             <span class="ev-meta">{{ number_format(strlen($raw) / 1024, 1) }} KB</span>
         </div>
 
@@ -184,6 +192,32 @@ Rendered inside the infolist — must NOT wrap in <x-filament-panels::page>,
                 </div>
             @else
                 <div class="ev-empty">No attachments.</div>
+            @endif
+        </div>
+
+        {{-- HTML checks (App\Services\EmailChecks) --}}
+        <div x-show="tab === 'checks'" role="tabpanel" style="display: none;">
+            @if (count($checks))
+                <div class="ev-panel">
+                    <table class="ev-headers">
+                        @foreach ($checks as $check)
+                            <tr>
+                                <td class="ev-hname">
+                                    <span @class(['ev-level', 'ev-level-error' => $check['level'] === 'error'])>{{ $check['level'] === 'error' ? 'Error' : 'Warning' }}</span>
+                                </td>
+                                <td class="ev-hname ev-muted">{{ $check['category'] }}</td>
+                                <td>
+                                    <div>{{ $check['message'] }}</div>
+                                    @if ($check['detail'])
+                                        <div class="ev-check-detail">{{ $check['detail'] }}</div>
+                                    @endif
+                                </td>
+                            </tr>
+                        @endforeach
+                    </table>
+                </div>
+            @else
+                <div class="ev-empty">No problems found in the HTML.</div>
             @endif
         </div>
 
@@ -411,6 +445,44 @@ Rendered inside the infolist — must NOT wrap in <x-filament-panels::page>,
             .ev-attach-size {
                 font-size: 0.72rem;
                 opacity: 0.55;
+            }
+
+            .ev-badge-error {
+                background: rgba(239, 68, 68, 0.25);
+                color: #f87171;
+            }
+
+            .ev-badge-ok {
+                background: rgba(34, 197, 94, 0.2);
+                color: #4ade80;
+            }
+
+            .ev-level {
+                display: inline-block;
+                padding: 0.05rem 0.45rem;
+                border-radius: 0.25rem;
+                font-size: 0.72rem;
+                font-weight: 600;
+                background: rgba(245, 158, 11, 0.2);
+                color: #fbbf24;
+            }
+
+            .ev-level-error {
+                background: rgba(239, 68, 68, 0.2);
+                color: #f87171;
+            }
+
+            .ev-muted {
+                opacity: 0.6;
+                font-weight: 400;
+            }
+
+            .ev-check-detail {
+                margin-top: 0.15rem;
+                font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+                font-size: 0.75rem;
+                opacity: 0.6;
+                word-break: break-all;
             }
 
             .ev-empty {

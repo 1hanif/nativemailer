@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Support\MimeHeader;
+use App\Support\PreviewLinks;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\MassPrunable;
@@ -81,17 +82,42 @@ class Email extends Model
     }
 
     /**
-     * The HTML body with cid: references (inline images) pointed at the
-     * matching attachments' URLs, ready for the preview.
+     * HTML for the preview iframe: inline images embedded, the email's
+     * own scripts blocked, and link clicks handed to the parent page
+     * (see PreviewLinks).
+     */
+    public function previewHtml(): ?string
+    {
+        $html = $this->htmlWithInlineImages();
+
+        return blank($html) ? $html : PreviewLinks::prepare($html);
+    }
+
+    /**
+     * The HTML body with cid: references (inline images) replaced by
+     * data: URIs of the matching attachments.
+     *
+     * Embedded rather than linked on purpose: the preview iframe is
+     * sandboxed (opaque origin), and Chromium's Local Network Access
+     * rules block such frames from requesting 127.0.0.1, which is where
+     * the attachment route lives. Only referenced images are embedded;
+     * other attachments are still served by AttachmentController.
      */
     public function htmlWithInlineImages(): ?string
     {
-        if (blank($this->body_html) || ! str_contains(strtolower($this->body_html), 'cid:')) {
+        if (blank($this->body_html) || ! preg_match_all('/cid:([^"\'\s)>]+)/i', $this->body_html, $m)) {
             return $this->body_html;
         }
 
-        $byCid = $this->attachments()->withoutContent()->whereNotNull('content_id')->get()
-            ->mapWithKeys(fn (EmailAttachment $att) => [strtolower($att->content_id) => $att->url()]);
+        $cids = array_unique(array_map(fn ($cid) => strtolower(rawurldecode($cid)), $m[1]));
+
+        $byCid = $this->attachments()
+            ->whereNotNull('content_id')
+            ->get()
+            ->filter(fn (EmailAttachment $att) => in_array(strtolower($att->content_id), $cids, true))
+            ->mapWithKeys(fn (EmailAttachment $att) => [
+                strtolower($att->content_id) => 'data:'.$att->content_type.';base64,'.base64_encode($att->content),
+            ]);
 
         if ($byCid->isEmpty()) {
             return $this->body_html;

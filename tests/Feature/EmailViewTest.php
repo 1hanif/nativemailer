@@ -25,26 +25,26 @@ function emailWithAttachments(): Email
     return $email;
 }
 
-test('cid references point at the attachment URL, case-insensitively', function () {
+test('only cid-referenced images are embedded, case-insensitively', function () {
     $email = emailWithAttachments();
-    $logo = $email->attachments()->where('name', 'logo.png')->first();
 
     expect($email->htmlWithInlineImages())
-        ->toBe('<p><img src="'.$logo->url().'"><img src="cid:missing@x"></p>');
+        ->toBe('<p><img src="data:image/png;base64,'.base64_encode("\x89PNG\r\n\x1a\n").'"><img src="cid:missing@x"></p>');
 });
 
-test('the view page links attachments instead of embedding them', function () {
+test('the view page embeds inline images and links other attachments', function () {
     $email = emailWithAttachments();
-    $logo = $email->attachments()->where('name', 'logo.png')->first();
+    $pdf = $email->attachments()->where('name', 'résumé.pdf')->first();
 
     $html = $this->get("/admin/emails/{$email->id}")->assertOk()->getContent();
 
     expect($html)
-        ->toContain('srcdoc="&lt;p&gt;&lt;img src=&quot;'.e($logo->url()))
-        ->not->toContain('base64,')
+        ->toContain('&lt;img src=&quot;data:image/png;base64,'.base64_encode("\x89PNG\r\n\x1a\n"))
+        // the PDF is a download link, never inlined
+        ->not->toContain('data:application/pdf')
+        ->toContain(e($pdf->url()).'?download=1')
         ->toContain('secret@x.test')
         ->toContain('c@x.test')
-        ->toContain('résumé.pdf')
         // the inline logo is shown in the HTML, so only the PDF gets a card
         ->and(substr_count($html, 'class="ev-attach-card"'))->toBe(1);
 });

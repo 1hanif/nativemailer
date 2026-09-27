@@ -1,7 +1,7 @@
 {{-- Mailpit-style tabbed message viewer.
 Rendered inside the infolist — must NOT wrap in <x-filament-panels::page>,
     that duplicates the page header/breadcrumbs --}}
-    <div x-data="{ tab: 'html' }" class="email-viewer">
+    <div x-data="{ tab: 'html', device: 'desktop' }" class="email-viewer">
 
         @php
             use App\Support\MimeHeader;
@@ -49,9 +49,29 @@ Rendered inside the infolist — must NOT wrap in <x-filament-panels::page>,
         {{-- HTML preview --}}
         <div x-show="tab === 'html'" role="tabpanel">
             @if (filled($email->body_html))
-                <div class="ev-panel ev-white">
-                    {{-- Fully sandboxed: no scripts, no same-origin access — email HTML is untrusted --}}
-                    <iframe srcdoc="{{ $email->htmlWithInlineImages() }}" class="ev-iframe" sandbox="" title="Email Preview"></iframe>
+                {{-- Preview widths: how the email reflows on common screens --}}
+                <div class="ev-devices" role="group" aria-label="Preview width">
+                    @foreach (['desktop' => ['Desktop', 'heroicon-o-computer-desktop'], 'tablet' => ['Tablet · 768px', 'heroicon-o-device-tablet'], 'mobile' => ['Mobile · 375px', 'heroicon-o-device-phone-mobile']] as $key => [$label, $icon])
+                        <button type="button" @click="device = '{{ $key }}'" :class="{ 'ev-active': device === '{{ $key }}' }"
+                            title="{{ $label }}" aria-label="{{ $label }}">
+                            <x-filament::icon :icon="$icon" class="ev-device-icon" />
+                        </button>
+                    @endforeach
+                    <span class="ev-meta">Links open in your browser</span>
+                </div>
+                <div class="ev-panel ev-white ev-stage">
+                    {{-- Sandboxed with an opaque origin — email HTML is untrusted. allow-scripts only
+                         runs our nonce'd click forwarder; the email's own scripts are blocked by the
+                         CSP PreviewLinks injects. Clicks arrive here via postMessage. --}}
+                    <iframe x-ref="preview" srcdoc="{{ $email->previewHtml() }}" class="ev-iframe"
+                        sandbox="allow-scripts" title="Email Preview"
+                        :style="{ width: { desktop: '100%', tablet: '768px', mobile: '375px' }[device] }"
+                        x-on:message.window="
+                            if ($event.source !== $refs.preview.contentWindow || $event.data?.type !== '{{ \App\Support\PreviewLinks::MESSAGE_TYPE }}') return;
+                            const url = String($event.data.url);
+                            {{-- Outside the desktop app there's no shell: open a tab while the click still counts as a user gesture --}}
+                            @js((bool) config('nativephp-internal.running')) ? $wire.openLink(url) : window.open(url, '_blank', 'noopener');
+                        "></iframe>
                 </div>
             @elseif (filled($email->body_text))
                 <div class="ev-panel ev-white">
@@ -234,9 +254,54 @@ Rendered inside the infolist — must NOT wrap in <x-filament-panels::page>,
 
             .ev-iframe {
                 width: 100%;
-                height: 600px;
+                max-width: 100%;
+                height: 100%;
                 border: none;
                 display: block;
+                margin: 0 auto;
+                transition: width 0.2s ease;
+            }
+
+            /* Narrow previews sit centred on a tinted stage, like a device */
+            .ev-stage {
+                height: 600px;
+                min-height: 240px;
+                resize: vertical;
+                overflow: auto;
+                background: #e2e8f0;
+            }
+
+            .ev-devices {
+                display: flex;
+                align-items: center;
+                gap: 0.25rem;
+                margin-bottom: 0.5rem;
+            }
+
+            .ev-devices button {
+                display: flex;
+                padding: 0.35rem 0.5rem;
+                border: 1px solid transparent;
+                border-radius: 0.375rem;
+                background: none;
+                color: inherit;
+                opacity: 0.55;
+                cursor: pointer;
+            }
+
+            .ev-devices button:hover {
+                opacity: 0.9;
+            }
+
+            .ev-devices button.ev-active {
+                opacity: 1;
+                border-color: rgba(128, 128, 128, 0.35);
+                color: #f59e0b;
+            }
+
+            .ev-device-icon {
+                width: 1.1rem;
+                height: 1.1rem;
             }
 
             .ev-pre {

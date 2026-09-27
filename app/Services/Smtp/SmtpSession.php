@@ -11,8 +11,11 @@ namespace App\Services\Smtp;
 class SmtpSession
 {
     private const STATE_HELO = 'HELO';
+
     private const STATE_MAIL = 'MAIL';
+
     private const STATE_RCPT = 'RCPT';
+
     private const STATE_DATA_BODY = 'DATA_BODY';
 
     /**
@@ -26,9 +29,13 @@ class SmtpSession
     private const MAX_COMMAND_LINE = 4096;
 
     private string $state = self::STATE_HELO;
+
     private string $buffer = '';
+
     private string $raw = '';
+
     private ?string $mailFrom = null;
+
     private array $recipients = [];
 
     /** Set once the current message passes maxMessageSize; the rest is discarded */
@@ -65,11 +72,13 @@ class SmtpSession
 
             if ($this->state === self::STATE_DATA_BODY) {
                 $this->handleBodyLine($line);
+
                 continue;
             }
 
             if ($this->authStep !== null) {
                 $this->handleAuthLine(trim($line));
+
                 continue;
             }
 
@@ -121,7 +130,7 @@ class SmtpSession
         if (isset($line[0]) && $line[0] === '.') {
             $line = substr($line, 1);
         }
-        $this->raw .= $line . "\r\n";
+        $this->raw .= $line."\r\n";
 
         if (strlen($this->raw) > $this->maxMessageSize) {
             $this->tooLarge = true;
@@ -137,7 +146,7 @@ class SmtpSession
         if (preg_match('/^EHLO\b/i', $line)) {
             $lines = ['localhost', "SIZE {$this->maxMessageSize}", ...self::EXTENSIONS];
             $last = array_pop($lines);
-            $this->reply(implode('', array_map(fn ($l) => "250-{$l}\r\n", $lines)) . "250 {$last}\r\n");
+            $this->reply(implode('', array_map(fn ($l) => "250-{$l}\r\n", $lines))."250 {$last}\r\n");
             $this->resetTransaction(self::STATE_MAIL);
         } elseif (preg_match('/^HELO\b/i', $line)) {
             $this->reply("250 localhost\r\n");

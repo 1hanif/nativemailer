@@ -1,5 +1,6 @@
 <?php
 
+use App\Filament\Resources\Emails\Pages\ListEmails;
 use App\Models\Email;
 use App\Models\EmailAttachment;
 use App\Services\Smtp\PersistCapturedEmail;
@@ -10,11 +11,11 @@ uses(RefreshDatabase::class);
 function captureWithPdf(string $pdfBytes): Email
 {
     $raw = "From: a@x.test\r\nTo: b@x.test\r\nSubject: Report\r\nContent-Type: multipart/mixed; boundary=\"B\"\r\n\r\n"
-        . "--B\r\nContent-Type: text/plain\r\n\r\nSee attached\r\n"
-        . "--B\r\nContent-Type: application/pdf\r\nContent-Disposition: attachment; filename=\"report.pdf\"\r\n"
-        . "Content-Transfer-Encoding: base64\r\n\r\n" . chunk_split(base64_encode($pdfBytes)) . "\r\n--B--\r\n";
+        ."--B\r\nContent-Type: text/plain\r\n\r\nSee attached\r\n"
+        ."--B\r\nContent-Type: application/pdf\r\nContent-Disposition: attachment; filename=\"report.pdf\"\r\n"
+        ."Content-Transfer-Encoding: base64\r\n\r\n".chunk_split(base64_encode($pdfBytes))."\r\n--B--\r\n";
 
-    (new PersistCapturedEmail())($raw, 'a@x.test', ['b@x.test']);
+    (new PersistCapturedEmail)($raw, 'a@x.test', ['b@x.test']);
 
     return Email::latest('id')->firstOrFail();
 }
@@ -57,7 +58,7 @@ test('images render inline unless a download is requested', function () {
     expect($inline->headers->get('Content-Disposition'))->toStartWith('inline;')
         ->and($inline->headers->get('Content-Security-Policy'))->toContain('sandbox');
 
-    expect($this->get($image->url() . '?download=1')->headers->get('Content-Disposition'))
+    expect($this->get($image->url().'?download=1')->headers->get('Content-Disposition'))
         ->toStartWith('attachment;')
         ->toContain("filename*=utf-8''%C3%BCn%C3%AF.png");
 });
@@ -66,7 +67,7 @@ test('the inbox list query skips the heavy columns', function () {
     captureWithPdf('PDF');
 
     DB::enableQueryLog();
-    Livewire\Livewire::test(App\Filament\Resources\Emails\Pages\ListEmails::class)->assertSee('Report');
+    Livewire\Livewire::test(ListEmails::class)->assertSee('Report');
     $queries = collect(DB::getQueryLog())->pluck('query')->filter(fn ($q) => str_contains($q, 'from "emails"') && str_contains($q, 'order by "received_at"'));
 
     expect($queries)->not->toBeEmpty();

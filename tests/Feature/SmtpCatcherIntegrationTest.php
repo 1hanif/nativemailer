@@ -16,7 +16,7 @@ use Symfony\Component\Process\Process;
  */
 
 beforeEach(function () {
-    $this->dbPath = tempnam(sys_get_temp_dir(), 'catcher') . '.sqlite';
+    $this->dbPath = tempnam(sys_get_temp_dir(), 'catcher').'.sqlite';
     touch($this->dbPath);
 
     $socket = stream_socket_server('tcp://127.0.0.1:0');
@@ -37,15 +37,15 @@ beforeEach(function () {
     $this->catcher->start();
 
     $deadline = microtime(true) + 10;
-    while (!($conn = @fsockopen('127.0.0.1', $this->port, $errno, $errstr, 0.1))) {
-        if (microtime(true) > $deadline || !$this->catcher->isRunning()) {
-            $this->fail('Catcher did not start: ' . $this->catcher->getErrorOutput() . $this->catcher->getOutput());
+    while (! ($conn = @fsockopen('127.0.0.1', $this->port, $errno, $errstr, 0.1))) {
+        if (microtime(true) > $deadline || ! $this->catcher->isRunning()) {
+            $this->fail('Catcher did not start: '.$this->catcher->getErrorOutput().$this->catcher->getOutput());
         }
         usleep(50_000);
     }
     fclose($conn);
 
-    $this->db = new PDO('sqlite:' . $this->dbPath);
+    $this->db = new PDO('sqlite:'.$this->dbPath);
 });
 
 afterEach(function () {
@@ -60,7 +60,7 @@ function catcherTransport(int $port, bool $auth = true)
 }
 
 test('an authenticated Symfony Mailer message is captured with cc, bcc and attachments', function () {
-    $message = (new Email())
+    $message = (new Email)
         ->from(new Address('app@x.test', 'App'))
         ->to(new Address('john@x.test', 'Doe, John'))
         ->cc('cc@x.test')
@@ -88,7 +88,7 @@ test('an authenticated Symfony Mailer message is captured with cc, bcc and attac
 
 test('fixture messages survive a real SMTP round trip, dot-stuffing included', function () {
     $raw = file_get_contents(base_path('tests/Fixtures/emails/apple-nested-multipart.eml'))
-        . ".leading dot line\r\n";
+        .".leading dot line\r\n";
 
     catcherTransport($this->port, auth: false)->send(
         new RawMessage($raw),
@@ -102,7 +102,7 @@ test('fixture messages survive a real SMTP round trip, dot-stuffing included', f
 });
 
 test('messages over SMTP_CATCHER_MAX_SIZE are refused and not stored', function () {
-    $message = (new Email())->from('a@x.test')->to('b@x.test')->subject('huge')->text(str_repeat('x', 200_000));
+    $message = (new Email)->from('a@x.test')->to('b@x.test')->subject('huge')->text(str_repeat('x', 200_000));
 
     expect(fn () => catcherTransport($this->port)->send($message))
         ->toThrow(UnexpectedResponseException::class, '552');

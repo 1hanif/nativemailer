@@ -15,7 +15,7 @@ function parseFixture(string $name, array $envelope = []): array
 {
     $raw = file_get_contents(base_path("tests/Fixtures/emails/{$name}.eml"));
 
-    return (new MimeMessageParser())->parse($raw, 'envelope@x.test', $envelope);
+    return (new MimeMessageParser)->parse($raw, 'envelope@x.test', $envelope);
 }
 
 function attachmentSummary(array $data): array

@@ -27,19 +27,19 @@ class NativeAppServiceProvider implements ProvidesPhpIni
         // Fires only if the catcher writes to stdout (it shouldn't — kept for debugging)
         Event::listen(MessageReceived::class, function (MessageReceived $event) {
             if ($event->alias === 'smtp-catcher') {
-                Log::info('SMTP Catcher Output: ' . $event->data);
+                Log::info('SMTP Catcher Output: '.$event->data);
             }
         });
 
         Event::listen(ErrorReceived::class, function (ErrorReceived $event) {
             if ($event->alias === 'smtp-catcher') {
-                Log::error('SMTP Catcher Error: ' . $event->data);
+                Log::error('SMTP Catcher Error: '.$event->data);
             }
         });
 
         // Clicking the notification opens the email in the main window
         Event::listen(NotificationClicked::class, function (NotificationClicked $event) {
-            if (!str_starts_with($event->reference, 'email:')) {
+            if (! str_starts_with($event->reference, 'email:')) {
                 return;
             }
 
@@ -49,7 +49,7 @@ class NativeAppServiceProvider implements ProvidesPhpIni
                 Window::get('main')->url(EmailResource::getUrl('view', ['record' => $id]));
                 Window::show('main');
             } catch (Throwable $e) {
-                Log::warning('Could not open email from notification: ' . $e->getMessage());
+                Log::warning('Could not open email from notification: '.$e->getMessage());
             }
         });
     }

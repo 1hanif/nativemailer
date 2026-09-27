@@ -70,12 +70,12 @@ class Email extends Model
      */
     public static function pruneNow(): int
     {
-        return (new static())->pruneAll();
+        return (new static)->pruneAll();
     }
 
     public function markAsRead(): void
     {
-        if (!$this->is_read) {
+        if (! $this->is_read) {
             $this->update(['is_read' => true]);
         }
     }
@@ -86,7 +86,7 @@ class Email extends Model
      */
     public function htmlWithInlineImages(): ?string
     {
-        if (blank($this->body_html) || !str_contains(strtolower($this->body_html), 'cid:')) {
+        if (blank($this->body_html) || ! str_contains(strtolower($this->body_html), 'cid:')) {
             return $this->body_html;
         }
 

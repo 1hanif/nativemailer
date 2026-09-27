@@ -23,7 +23,7 @@ function runSession(array $lines, int $maxMessageSize = 50 * 1024 * 1024): array
     );
 
     $session->greet();
-    $session->feed(implode("\r\n", $lines) . "\r\n");
+    $session->feed(implode("\r\n", $lines)."\r\n");
 
     return [$replies, $messages];
 }
@@ -41,7 +41,7 @@ test('HELO keeps the single-line reply', function () {
 });
 
 test('AUTH PLAIN with an initial response is accepted', function () {
-    [$replies] = runSession(['EHLO x', 'AUTH PLAIN ' . base64_encode("\0user\0secret")]);
+    [$replies] = runSession(['EHLO x', 'AUTH PLAIN '.base64_encode("\0user\0secret")]);
 
     expect($replies[2])->toStartWith('235 ');
 });
@@ -62,7 +62,7 @@ test('AUTH LOGIN walks through username and password prompts', function () {
 });
 
 test('AUTH LOGIN with the username inline skips straight to the password', function () {
-    [$replies] = runSession(['EHLO x', 'AUTH LOGIN ' . base64_encode('user'), base64_encode('secret')]);
+    [$replies] = runSession(['EHLO x', 'AUTH LOGIN '.base64_encode('user'), base64_encode('secret')]);
 
     expect($replies[2])->toBe("334 UGFzc3dvcmQ6\r\n")
         ->and($replies[3])->toStartWith('235 ');
@@ -90,7 +90,7 @@ test('AUTH before EHLO is rejected', function () {
 test('an authenticated session delivers mail with every envelope recipient', function () {
     [, $messages] = runSession([
         'EHLO x',
-        'AUTH PLAIN ' . base64_encode("\0user\0secret"),
+        'AUTH PLAIN '.base64_encode("\0user\0secret"),
         'MAIL FROM:<sender@x.test> SIZE=120 BODY=8BITMIME',
         'RCPT TO:<to@x.test>',
         'RCPT TO:<hidden@x.test>',
@@ -138,8 +138,12 @@ test('an oversized line without CRLF in DATA is discarded', function () {
     $replies = [];
     $messages = [];
     $session = new SmtpSession(
-        send: function (string $r) use (&$replies) { $replies[] = $r; },
-        onMessage: function (...$args) use (&$messages) { $messages[] = $args; },
+        send: function (string $r) use (&$replies) {
+            $replies[] = $r;
+        },
+        onMessage: function (...$args) use (&$messages) {
+            $messages[] = $args;
+        },
         close: fn () => null,
         maxMessageSize: 100,
     );

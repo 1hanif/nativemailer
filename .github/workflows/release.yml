@@ -56,6 +56,66 @@ jobs:
       - name: Build native app
         run: php artisan native:build ${{ matrix.platform }}
 
+      # The mac build is unsigned: the main binary is ad-hoc signed by the linker while
+      # Electron Framework keeps its own signature, and the hardened runtime then refuses
+      # to load it ("different Team IDs"). Re-sign the whole bundle ad-hoc (without the
+      # hardened runtime) so every binary shares one identity, then repackage.
+      - name: Re-sign macOS app ad-hoc & repackage
+        if: matrix.platform == 'mac'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd nativephp/electron/dist
+
+          APP=$(find . -maxdepth 2 -name '*.app' -type d | head -n 1)
+          [ -n "$APP" ] || { echo "No .app bundle found"; exit 1; }
+          APP_NAME=$(basename "$APP")
+          echo "Re-signing $APP"
+
+          xattr -cr "$APP"
+          codesign --force --deep --sign - "$APP"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+
+          # Rebuild the zip (ditto keeps the framework symlinks intact)
+          for ZIP in *.zip; do
+            rm -f "$ZIP"
+            ditto -c -k --sequesterRsrc --keepParent "$APP" "$ZIP"
+          done
+
+          # Rebuild the dmg with the usual drag-to-Applications layout
+          for DMG in *.dmg; do
+            STAGE=$(mktemp -d)
+            ditto "$APP" "$STAGE/$APP_NAME"
+            ln -s /Applications "$STAGE/Applications"
+            rm -f "$DMG"
+            hdiutil create -volname "${APP_NAME%.app}" -srcfolder "$STAGE" -ov -format UDZO "$DMG"
+            rm -rf "$STAGE"
+          done
+
+          # The old blockmaps no longer match; the updater falls back to a full download
+          rm -f *.zip.blockmap *.dmg.blockmap
+
+          # Point latest-mac.yml at the new hashes/sizes so auto-update verification passes
+          node -e '
+            const fs = require("fs"), crypto = require("crypto");
+            const file = "latest-mac.yml";
+            if (!fs.existsSync(file)) process.exit(0);
+            const info = f => ({
+              sha512: crypto.createHash("sha512").update(fs.readFileSync(f)).digest("base64"),
+              size: fs.statSync(f).size,
+            });
+            let current = null;
+            const out = fs.readFileSync(file, "utf8").split("\n").map(line => {
+              const m = line.match(/^(\s*(?:- )?)(url|path|sha512|size):\s*(.*)$/);
+              if (!m) return line;
+              const [, indent, key, value] = m;
+              if (key === "url" || key === "path") { current = fs.existsSync(value) ? info(value) : null; return line; }
+              return current ? `${indent}${key}: ${current[key]}` : line;
+            });
+            fs.writeFileSync(file, out.join("\n"));
+          '
+          cat latest-mac.yml || true
+
       - name: List build output
         shell: bash
         run: ls -la nativephp/electron/dist/ || true

@@ -30,8 +30,8 @@ jobs:
 
       - uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.3'
-          extensions: mbstring, intl, zip, pdo_sqlite, mailparse, fileinfo, curl, dom, xml
+          php-version: '8.4'
+          extensions: mbstring, intl, zip, pdo_sqlite, fileinfo, curl, dom, xml
 
       - uses: actions/setup-node@v4
         with:

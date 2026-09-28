@@ -1,0 +1,21 @@
+From: calendar@x.test
+To: you@x.test
+Subject: Invitation: Standup
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="cal"
+
+--cal
+Content-Type: text/plain; charset="UTF-8"
+
+You have been invited to Standup.
+--cal
+Content-Type: text/calendar; charset="UTF-8"; method=REQUEST
+Content-Transfer-Encoding: 7bit
+
+BEGIN:VCALENDAR
+METHOD:REQUEST
+BEGIN:VEVENT
+SUMMARY:Standup
+END:VEVENT
+END:VCALENDAR
+--cal--

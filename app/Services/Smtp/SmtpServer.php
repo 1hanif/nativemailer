@@ -22,6 +22,7 @@ class SmtpServer
         private string $host,
         private int $port,
         private int $timeout,
+        private int $maxMessageSize,
         /** @var callable(string $raw, ?string $from, array $recipients): void */
         private $onMessage,
     ) {}
@@ -62,18 +63,18 @@ class SmtpServer
     {
         $this->socket = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
         if ($this->socket === false) {
-            throw new Exception('Socket creation failed: ' . socket_strerror(socket_last_error()));
+            throw new Exception('Socket creation failed: '.socket_strerror(socket_last_error()));
         }
 
         socket_set_option($this->socket, SOL_SOCKET, SO_REUSEADDR, 1);
         socket_set_nonblock($this->socket);
 
-        if (!socket_bind($this->socket, $this->host, $this->port)) {
-            throw new Exception('Socket bind failed: ' . socket_strerror(socket_last_error()));
+        if (! socket_bind($this->socket, $this->host, $this->port)) {
+            throw new Exception('Socket bind failed: '.socket_strerror(socket_last_error()));
         }
 
-        if (!socket_listen($this->socket, 5)) {
-            throw new Exception('Socket listen failed: ' . socket_strerror(socket_last_error()));
+        if (! socket_listen($this->socket, 5)) {
+            throw new Exception('Socket listen failed: '.socket_strerror(socket_last_error()));
         }
     }
 
@@ -95,6 +96,7 @@ class SmtpServer
             close: function () use ($clientId) {
                 $this->closeClient($clientId);
             },
+            maxMessageSize: $this->maxMessageSize,
         );
 
         $this->clients[$clientId] = [

@@ -1,0 +1,5 @@
+From: cron@server.test
+To: admin@x.test
+Subject: Backup finished
+
+All 3 databases backed up.

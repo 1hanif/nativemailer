@@ -1,0 +1,59 @@
+name: Tests
+
+on:
+  pull_request:
+  push:
+    branches: [main, v2]
+
+# A new push to the same branch/PR cancels the run it supersedes
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  pest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          # sockets: the SMTP catcher; iconv/mbstring: charset conversion
+          extensions: mbstring, intl, iconv, sockets, pdo_sqlite, fileinfo
+          coverage: none
+
+      - name: Cache Composer packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.composer/cache/files
+          key: composer-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-
+
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Prepare environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Check code style
+        run: vendor/bin/pint --test
+
+      # Includes tests/Feature/SmtpCatcherIntegrationTest.php, which starts
+      # the real catcher on a free port and sends mail to it over TCP
+      - name: Run tests
+        run: php artisan test
+
+      - name: Upload catcher log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs
+          path: storage/logs/
+          if-no-files-found: ignore

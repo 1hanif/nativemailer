@@ -26,7 +26,7 @@ class MimeMessageParser
         $rawMessage = str_replace("\n", "\r\n", $rawMessage);
 
         if (strpos($rawMessage, "\r\n\r\n") !== false) {
-            list($headerString, $bodyString) = explode("\r\n\r\n", $rawMessage, 2);
+            [$headerString, $bodyString] = explode("\r\n\r\n", $rawMessage, 2);
         } else {
             $headerString = $rawMessage;
             $bodyString = '';
@@ -39,13 +39,19 @@ class MimeMessageParser
         $headers = $this->parseHeaders($headerString);
 
         $fromEmail = self::extractAddress($headers['from'] ?? null) ?? $envelopeFrom;
-        $toEmails = array_filter(array_map(
-            [self::class, 'extractAddress'],
-            preg_split('/\s*,\s*/', $headers['to'] ?? '', -1, PREG_SPLIT_NO_EMPTY) ?: []
-        ));
+        $toEmails = self::extractAddressList($headers['to'] ?? null);
         if (empty($toEmails)) {
             $toEmails = $envelopeRecipients;
         }
+        $ccEmails = self::extractAddressList($headers['cc'] ?? null);
+
+        // Bcc never appears in the delivered headers: it is whoever was on
+        // the SMTP envelope but not in To/Cc.
+        $visible = array_map('strtolower', [...$toEmails, ...$ccEmails]);
+        $bccEmails = array_values(array_unique(array_filter(
+            $envelopeRecipients,
+            fn (string $rcpt) => ! in_array(strtolower($rcpt), $visible, true)
+        )));
 
         $result = ['text' => null, 'html' => null, 'attachments' => []];
         $this->parseMimePart($headers, $bodyString, $result);
@@ -53,6 +59,8 @@ class MimeMessageParser
         return [
             'from' => $fromEmail,
             'to' => implode(', ', $toEmails),
+            'cc' => $ccEmails ? implode(', ', $ccEmails) : null,
+            'bcc' => $bccEmails ? implode(', ', $bccEmails) : null,
             'subject' => MimeHeader::decode($headers['subject'] ?? null),
             'raw' => $rawMessage,
             'received_at' => now(),
@@ -74,9 +82,64 @@ class MimeMessageParser
         if (preg_match('/<([^>]+)>/', $string, $matches)) {
             return trim($matches[1]);
         }
-        $string = trim($string);
+        // No angle brackets: take the first token, dropping any trailing
+        // ESMTP parameters (e.g. "a@x.test SIZE=123")
+        $string = trim(preg_split('/\s+/', trim($string))[0] ?? '');
 
         return $string === '' ? null : $string;
+    }
+
+    /**
+     * Extract bare addresses from an address-list header, splitting only
+     * on commas outside quotes and angle brackets, so display names like
+     * "Doe, John" <j@x.test> stay intact.
+     *
+     * @return list<string>
+     */
+    public static function extractAddressList(?string $header): array
+    {
+        if ($header === null || trim($header) === '') {
+            return [];
+        }
+
+        $parts = [];
+        $current = '';
+        $inQuotes = false;
+        $inAngle = false;
+        $length = strlen($header);
+
+        for ($i = 0; $i < $length; $i++) {
+            $char = $header[$i];
+
+            if ($char === '\\' && $inQuotes && $i + 1 < $length) {
+                $current .= $char.$header[++$i];
+
+                continue;
+            }
+            if ($char === '"') {
+                $inQuotes = ! $inQuotes;
+            } elseif (! $inQuotes && $char === '<') {
+                $inAngle = true;
+            } elseif (! $inQuotes && $char === '>') {
+                $inAngle = false;
+            } elseif ($char === ',' && ! $inQuotes && ! $inAngle) {
+                $parts[] = $current;
+                $current = '';
+
+                continue;
+            }
+            $current .= $char;
+        }
+        $parts[] = $current;
+
+        // Unwrap RFC 5322 groups ("Team: a@x.test, b@x.test;") and drop
+        // anything that isn't an address, e.g. "undisclosed-recipients:;"
+        $parts = array_map(fn ($part) => rtrim(preg_replace('/^[^"<@]*:/', '', $part), '; '), $parts);
+
+        return array_values(array_filter(
+            array_map([self::class, 'extractAddress'], $parts),
+            fn (?string $address) => $address !== null && str_contains($address, '@')
+        ));
     }
 
     /**
@@ -114,7 +177,7 @@ class MimeMessageParser
 
         if (preg_match('/multipart\/[a-z-]+.*boundary=(?:"([^"]+)"|([^;\s]+))/is', $contentType, $m)) {
             $boundary = $m[1] !== '' ? $m[1] : $m[2];
-            $parts = preg_split('/\r\n--' . preg_quote($boundary, '/') . '/', "\r\n" . $body);
+            $parts = preg_split('/\r\n--'.preg_quote($boundary, '/').'/', "\r\n".$body);
 
             foreach ($parts as $i => $part) {
                 if ($i === 0) {
@@ -126,7 +189,7 @@ class MimeMessageParser
                 }
 
                 if (strpos($part, "\r\n\r\n") !== false) {
-                    list($partHeaderString, $partBody) = explode("\r\n\r\n", $part, 2);
+                    [$partHeaderString, $partBody] = explode("\r\n\r\n", $part, 2);
                 } else {
                     $partHeaderString = $part;
                     $partBody = '';
@@ -140,25 +203,115 @@ class MimeMessageParser
 
         // Leaf part
         $disposition = $headers['content-disposition'] ?? '';
-        $filename = null;
-        if (preg_match('/filename=(?:"([^"]+)"|([^;\s]+))/i', $disposition . ' ' . $contentType, $m)) {
-            $filename = $m[1] !== '' ? $m[1] : $m[2];
-        }
+        $mimeType = strtolower(trim(explode(';', $contentType)[0]));
+        $typeParams = self::parseParameters($contentType);
+        $filename = self::parseParameters($disposition)['filename'] ?? $typeParams['name'] ?? null;
+        $contentId = isset($headers['content-id']) ? trim($headers['content-id'], ' <>') : null;
 
         $decoded = $this->decodeContent($body, $headers['content-transfer-encoding'] ?? '');
 
-        if ($filename !== null || stripos($disposition, 'attachment') !== false) {
+        $isBody = in_array($mimeType, ['text/plain', 'text/html'], true)
+            && $filename === null
+            && stripos($disposition, 'attachment') === false;
+
+        if (! $isBody) {
+            // Anything that isn't a plain/HTML body is kept as an attachment,
+            // including inline images referenced from the HTML via cid:
             $result['attachments'][] = [
-                'name' => MimeHeader::decode($filename) ?? 'unnamed',
-                'content_type' => trim(explode(';', $contentType)[0]),
+                'name' => MimeHeader::decode($filename) ?? ($contentId ?: 'unnamed'),
+                'content_type' => $mimeType,
                 'size' => strlen($decoded),
-                'content' => base64_encode($decoded),
+                'content_id' => $contentId ?: null,
+                'inline' => $contentId && stripos($disposition, 'attachment') === false,
+                'content' => $decoded,
             ];
-        } elseif (stripos($contentType, 'text/html') !== false) {
-            $result['html'] = $result['html'] ?? $decoded;
+        } elseif ($mimeType === 'text/html') {
+            $result['html'] = $result['html'] ?? self::toUtf8($decoded, $typeParams['charset'] ?? null);
         } else {
-            $result['text'] = $result['text'] ?? $decoded;
+            $result['text'] = $result['text'] ?? self::toUtf8($decoded, $typeParams['charset'] ?? null);
         }
+    }
+
+    /**
+     * Parse the parameters of a structured header value such as
+     * Content-Type or Content-Disposition into a lowercase-keyed array.
+     * Handles quoted values and RFC 2231 extended parameters, including
+     * charset-encoded (name*=UTF-8''%E2%9C%93.pdf) and continuation
+     * (name*0=..., name*1*=...) forms.
+     *
+     * @return array<string, string>
+     */
+    public static function parseParameters(string $value): array
+    {
+        preg_match_all(
+            '/;\s*([^=\s;]+)\s*=\s*(?:"((?:[^"\\\\]|\\\\.)*)"|([^;\s]*))/',
+            $value,
+            $matches,
+            PREG_SET_ORDER
+        );
+
+        $params = [];
+        $extended = []; // name => [section => [value, isEncoded]]
+
+        foreach ($matches as $m) {
+            $name = strtolower($m[1]);
+            $raw = isset($m[3]) && $m[3] !== '' ? $m[3] : stripslashes($m[2]);
+
+            if (preg_match('/^(.+?)(?:\*(\d+))?(\*)?$/', $name, $parts) && (isset($parts[2]) && $parts[2] !== '' || ! empty($parts[3]))) {
+                $extended[$parts[1]][(int) ($parts[2] ?? 0)] = [$raw, ! empty($parts[3])];
+            } else {
+                $params[$name] = $raw;
+            }
+        }
+
+        foreach ($extended as $name => $sections) {
+            ksort($sections);
+            $charset = null;
+            $decoded = '';
+
+            foreach ($sections as $index => [$raw, $isEncoded]) {
+                if ($isEncoded) {
+                    // The first encoded section carries charset'language'
+                    if ($index === array_key_first($sections) && preg_match("/^([^']*)'[^']*'(.*)$/s", $raw, $cm)) {
+                        $charset = $cm[1] ?: null;
+                        $raw = $cm[2];
+                    }
+                    $raw = rawurldecode($raw);
+                }
+                $decoded .= $raw;
+            }
+
+            // Extended parameters take precedence over plain ones
+            $params[$name] = self::toUtf8($decoded, $charset);
+        }
+
+        return $params;
+    }
+
+    /**
+     * Convert text to UTF-8 from the declared charset. With no charset
+     * (or an unknown one), invalid UTF-8 is assumed to be Windows-1252,
+     * the most common mislabelled encoding.
+     */
+    public static function toUtf8(string $text, ?string $charset): string
+    {
+        $charset = $charset !== null ? strtoupper(trim($charset)) : null;
+
+        if (in_array($charset, ['UTF-8', 'UTF8', 'US-ASCII', 'ASCII'], true) || ($charset === null && mb_check_encoding($text, 'UTF-8'))) {
+            return mb_check_encoding($text, 'UTF-8') ? $text : mb_scrub($text, 'UTF-8');
+        }
+
+        if ($charset !== null) {
+            if (in_array($charset, array_map('strtoupper', mb_list_encodings()), true)) {
+                return mb_convert_encoding($text, 'UTF-8', $charset);
+            }
+            $converted = @iconv($charset, 'UTF-8//TRANSLIT//IGNORE', $text);
+            if ($converted !== false) {
+                return $converted;
+            }
+        }
+
+        return mb_check_encoding($text, 'UTF-8') ? $text : mb_convert_encoding($text, 'UTF-8', 'Windows-1252');
     }
 
     private function decodeContent(string $content, string $encoding): string

@@ -11,4 +11,5 @@ Artisan::command('inspire', function () {
 
 // Apply the inbox retention settings (see Email::prunable). NativePHP
 // runs the scheduler while the app is open.
-Schedule::command('model:prune', ['--model' => [Email::class]])->hourly();
+// pruneNow() rather than model:prune so the unread badge is refreshed too
+Schedule::call(fn () => Email::pruneNow())->hourly()->name('prune-emails');

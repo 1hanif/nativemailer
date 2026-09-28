@@ -42,6 +42,9 @@ jobs:
           cp .env.example .env
           php artisan key:generate
 
+      - name: Check code style
+        run: vendor/bin/pint --test
+
       # Includes tests/Feature/SmtpCatcherIntegrationTest.php, which starts
       # the real catcher on a free port and sends mail to it over TCP
       - name: Run tests

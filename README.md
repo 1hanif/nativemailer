@@ -14,9 +14,9 @@
   <img src="https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge" alt="License">
 </p>
 
-**Native Mailer** is a beautiful, cross-platform desktop application that provides a local SMTP server for catching and viewing emails during development. Built with Laravel, NativePHP, and Filament, it offers a modern, elegant solution for email testing without the need for external services.
+**Native Mailer** is a cross-platform desktop app that runs a local SMTP server for catching and viewing emails during development. Point your app at it and every email it sends lands in a local inbox instead of a real one. Built with Laravel, NativePHP and Filament; no external services needed.
 
-[Features](#-features) • [Installation](#-installation) • [Usage](#-usage) • [Documentation](#-documentation)
+[Features](#-features) • [Installation](#-installation) • [Usage](#-usage) • [Features guide](FEATURES.md)
 
 </div>
 
@@ -24,35 +24,37 @@
 
 ## ✨ Features
 
-### 🚀 Core Functionality
+See **[FEATURES.md](FEATURES.md)** for a full guide to every feature and how it works.
 
--   **Local SMTP Server** - Full-featured SMTP server running on `127.0.0.1:1025`
--   **Zero Configuration** - Works out of the box, no external dependencies
--   **Native Desktop App** - True native application for Windows, macOS, and Linux
--   **Automatic Email Capture** - Catches all emails sent to the SMTP server
+### 📬 Capturing mail
 
-### 💼 Email Management
+-   **Local SMTP server** on `127.0.0.1:1025`, started automatically with the app
+-   **Accepts any login**: apps with `MAIL_USERNAME`/`MAIL_PASSWORD` set deliver without changes
+-   **Every recipient**: To, CC, and BCC recovered from the SMTP envelope
+-   **Decodes real-world mail**: any charset to UTF-8, quoted-printable/base64, encoded subjects and filenames, nested multipart, inline images, calendar invites
+-   **Size limit**: messages over 50 MB are refused with `552` (configurable)
 
--   **Beautiful Admin Panel** - Powered by Filament 4.0 with a modern, intuitive interface
--   **Rich Email Preview** - View HTML emails in a sandboxed iframe with full styling
--   **Advanced Search** - Search emails by sender, recipient, or subject
--   **Bulk Operations** - Delete multiple emails at once
--   **Email Details** - View complete email metadata including headers and timestamps
+### 📥 The inbox
 
-### 🎨 User Interface
+-   **Live updates**: new mail appears the moment it's captured, with a desktop notification
+-   **Search** by sender, recipients, subject, **or message body**
+-   **Catcher status** under the title: running, port taken by another program, or down (with the reason)
+-   **Unread badge** on the app icon (macOS and Linux)
+-   **Read/unread** state, filters, bulk actions, and a paperclip for emails with attachments
 
--   **Modern Design** - Built with Tailwind CSS 4.0 for a clean, professional look
--   **Responsive Layout** - Works seamlessly on any screen size
--   **Dark Mode Ready** - Filament's built-in dark mode support
--   **Real-time Updates** - Instant email display as they arrive
+### 🔍 Reading an email
 
-### ⚡ Technical Excellence
+-   **Tabs** for HTML, HTML source, text, headers, raw source and attachments
+-   **Responsive preview** at desktop, tablet (768px) and mobile (375px) widths
+-   **Links open in your browser**; the preview never navigates away
+-   **Locked-down preview**: sandboxed iframe with a Content-Security-Policy that blocks the email's scripts
+-   **HTML checks**: flags development URLs, broken links, missing alt text, Gmail clipping, missing text part, and CSS Outlook ignores
 
--   **High Performance** - Non-blocking socket implementation for handling multiple connections
--   **SQLite Database** - Lightweight, serverless database for email storage
--   **Multipart Support** - Handles plain text and HTML emails with attachments
--   **Content Decoding** - Supports base64 and quoted-printable encoding
--   **Cross-platform** - Single codebase runs natively on all platforms
+### 🚀 Release and cleanup
+
+-   **Release** a captured email, unchanged, through a real SMTP relay to a real inbox
+-   **Retention**: delete emails older than N days and/or keep at most N emails, applied hourly
+-   **Delete all** in one click, compacting the database afterwards
 
 ---
 
@@ -60,7 +62,7 @@
 
 | Technology               | Version | Purpose                    |
 | ------------------------ | ------- | -------------------------- |
-| **PHP**                  | 8.4+    | Core language              |
+| **PHP**                  | 8.4+    | Core language (with the `sockets` extension) |
 | **Laravel**              | 12.0    | Application framework      |
 | **Filament**             | 4.0     | Admin panel framework      |
 | **NativePHP Desktop**    | 2.0     | Native application wrapper |
@@ -105,7 +107,7 @@ Before you begin, ensure your system meets these requirements:
 
 ```bash
 # Clone the repository
-git clone https://github.com/projecthanif/nativemailer.git
+git clone https://github.com/1hanif/nativemailer.git
 cd nativemailer
 
 # Run the automated setup
@@ -127,7 +129,7 @@ If you prefer manual installation:
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/projecthanif/nativemailer.git
+git clone https://github.com/1hanif/nativemailer.git
 cd nativemailer
 
 # 2. Install PHP dependencies
@@ -154,43 +156,44 @@ npm run build
 
 ### Running in Development Mode
 
-Start the application in development mode with hot-reload:
+Start the desktop app with hot-reload for assets:
 
 ```bash
-# Start the native application with auto-reload
-php artisan native:serve
-```
-
-Or use the composer script for concurrent development:
-
-```bash
-# Runs app and watches for changes
 composer native:dev
 ```
 
+This runs `php artisan native:run` and the Vite dev server together.
+
 **What happens when you start the app:**
 
-1. 🚀 NativePHP launches the native desktop window
-2. 📡 SMTP server starts automatically on `127.0.0.1:1025`
-3. 🎨 Filament admin panel opens at `/admin/emails`
-4. 📬 Application is ready to receive emails
+1. 🚀 NativePHP opens the desktop window
+2. 📡 The SMTP catcher starts as a background process on `127.0.0.1:1025`
+3. 📬 The inbox opens, ready to receive emails
+
+In development the app uses its own database, `database/nativephp.sqlite`, and doesn't migrate it on start. After pulling changes that add migrations, run:
+
+```bash
+php artisan native:migrate
+```
+
+Built apps migrate automatically the first time each new version starts.
 
 ### Building for Production
 
 Build native executables for distribution:
 
 ```bash
-# Build for your current platform
-php artisan native:build
-
-# Builds will be available in: builds/
+# Build for a platform: mac, win or linux
+php artisan native:build mac
 ```
 
-**Build Output:**
+Builds are written to `nativephp/electron/dist/`:
 
+-   **macOS:** `.dmg` and `.zip`
 -   **Windows:** `.exe` installer
--   **macOS:** `.dmg` disk image
--   **Linux:** `.AppImage` executable
+-   **Linux:** `.AppImage` and `.deb`
+
+Pushing a `v*` tag builds all three platforms on GitHub Actions and attaches them to a GitHub release (see `.github/workflows/release.yml`).
 
 ### Configuring Your Application
 
@@ -204,12 +207,11 @@ Update your `.env` file:
 MAIL_MAILER=smtp
 MAIL_HOST=127.0.0.1
 MAIL_PORT=1025
-MAIL_USERNAME=null
-MAIL_PASSWORD=null
-MAIL_ENCRYPTION=null
 MAIL_FROM_ADDRESS="test@example.com"
 MAIL_FROM_NAME="${APP_NAME}"
 ```
+
+`MAIL_USERNAME` and `MAIL_PASSWORD` can be left as they are: Native Mailer accepts any credentials. If you change the port in the app's Settings, update `MAIL_PORT` to match.
 
 #### Other PHP Applications
 
@@ -222,9 +224,8 @@ $mail->Port = 1025;
 $mail->SMTPAuth = false;
 
 // Symfony Mailer
-$transport = (new Smtp())
-    ->setHost('127.0.0.1')
-    ->setPort(1025);
+$transport = Symfony\Component\Mailer\Transport::fromDsn('smtp://127.0.0.1:1025');
+$mailer = new Symfony\Component\Mailer\Mailer($transport);
 ```
 
 #### Testing
@@ -249,45 +250,51 @@ Check the Native Mailer app to see your email!
 ## 📁 Project Structure
 
 ```
-native-mailer/
+nativemailer/
 ├── app/
-│   ├── Console/
-│   │   └── Commands/
-│   │       └── StartSmtpCatcher.php      # Artisan command to start SMTP
-│   ├── Filament/
-│   │   └── Resources/
-│   │       └── Emails/
-│   │           ├── EmailResource.php     # Filament resource definition
-│   │           ├── Pages/
-│   │           │   ├── ListEmails.php    # Email list page
-│   │           │   └── ViewEmail.php     # Email detail page
-│   │           ├── Schemas/
-│   │           │   └── EmailInfolist.php # Email display schema
-│   │           └── Tables/
-│   │               └── EmailsTable.php   # Table configuration
+│   ├── Console/Commands/
+│   │   └── StartSmtpCatcher.php          # `smtp:start`: runs the catcher
+│   ├── Events/
+│   │   └── EmailReceived.php             # Broadcast to the UI on capture
+│   ├── Filament/Resources/Emails/
+│   │   ├── EmailResource.php
+│   │   ├── Pages/
+│   │   │   ├── ListEmails.php            # Inbox, settings, Delete all, status
+│   │   │   └── ViewEmail.php             # Email view, Release, link opening
+│   │   ├── Schemas/EmailInfolist.php
+│   │   └── Tables/EmailsTable.php        # Inbox columns, search, bulk actions
+│   ├── Http/Controllers/
+│   │   └── AttachmentController.php      # Serves attachment downloads
 │   ├── Models/
-│   │   └── Email.php                     # Email Eloquent model
+│   │   ├── Email.php                     # Retention (pruning), inline images
+│   │   ├── EmailAttachment.php
+│   │   └── Setting.php                   # Key/value app settings
 │   ├── Providers/
-│   │   └── NativeAppServiceProvider.php  # NativePHP config
-│   └── Services/
-│       ├── SmtpCatcher.php               # Core SMTP server implementation
-│       └── SmtpServiceManager.php        # Service lifecycle management
-├── database/
-│   └── migrations/
-│       └── 2025_10_25_020118_create_emails_table.php
-├── resources/
-│   ├── css/
-│   │   └── app.css                       # Tailwind styles
-│   ├── js/
-│   │   └── app.js                        # Frontend JavaScript
-│   └── views/
-│       └── filament/
-│           └── email-html-view.blade.php # Email HTML renderer
+│   │   └── NativeAppServiceProvider.php  # Window, catcher process, notifications
+│   ├── Services/
+│   │   ├── SmtpCatcher.php               # Wires the server to the handler
+│   │   ├── Smtp/
+│   │   │   ├── SmtpServer.php            # Sockets and the select loop
+│   │   │   ├── SmtpSession.php           # SMTP protocol state machine
+│   │   │   ├── MimeMessageParser.php     # Raw message → headers, bodies, attachments
+│   │   │   └── PersistCapturedEmail.php  # Store, broadcast, notify
+│   │   ├── CatcherStatus.php             # Is the catcher up?
+│   │   ├── EmailChecks.php               # HTML checks tab
+│   │   ├── ReleaseEmail.php              # Forward through a real relay
+│   │   └── UnreadBadge.php               # App icon badge
+│   └── Support/
+│       ├── MimeHeader.php                # RFC 2047 decoding
+│       └── PreviewLinks.php              # Preview CSP and link forwarding
+├── database/migrations/
+├── resources/views/filament/
+│   └── email-html-view.blade.php         # The tabbed email viewer
 ├── routes/
-│   └── web.php                           # Route definitions
-├── config/
-│   └── nativephp.php                     # NativePHP configuration
-└── composer.json                         # PHP dependencies
+│   ├── web.php                           # Attachment route
+│   └── console.php                       # Hourly retention cleanup
+└── tests/
+    ├── Feature/                          # Pages, storage, retention, integration
+    ├── Unit/                             # SMTP session, parser, checks
+    └── Fixtures/emails/                  # Real-world .eml messages
 ```
 
 ---
@@ -296,38 +303,32 @@ native-mailer/
 
 ### SMTP Server Architecture
 
-The SMTP server is implemented in `SmtpCatcher.php` using PHP's socket functions:
+The catcher runs as a separate NativePHP child process (`php artisan smtp:start`), split into small classes under `app/Services/Smtp`:
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                   SMTP Catcher                      │
-│                                                     │
-│  ┌──────────────┐    ┌──────────────┐             │
-│  │   Socket     │───▶│   Client     │             │
-│  │   Listener   │    │   Handler    │             │
-│  │ (Port 1025)  │    │  (Non-block) │             │
-│  └──────────────┘    └──────────────┘             │
-│         │                    │                      │
-│         ▼                    ▼                      │
-│  ┌──────────────┐    ┌──────────────┐             │
-│  │   Accept     │    │   Parse      │             │
-│  │  Connection  │    │   SMTP       │             │
-│  └──────────────┘    └──────────────┘             │
-│                             │                       │
-│                             ▼                       │
-│                      ┌──────────────┐              │
-│                      │   Store in   │              │
-│                      │   Database   │              │
-│                      └──────────────┘              │
-└─────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│                 smtp:start (child process)                   │
+│                                                              │
+│  ┌──────────────┐    ┌──────────────┐    ┌────────────────┐  │
+│  │  SmtpServer  │───▶│ SmtpSession  │───▶│    Persist     │  │
+│  │ sockets and  │    │  one per     │    │ CapturedEmail  │  │
+│  │ select loop  │    │  client      │    │                │  │
+│  └──────────────┘    └──────────────┘    └────────────────┘  │
+│                                              │         │     │
+│                                              ▼         ▼     │
+│                                   ┌──────────────┐ ┌───────┐ │
+│                                   │ MimeMessage  │ │  DB,  │ │
+│                                   │ Parser       │ │ event,│ │
+│                                   └──────────────┘ │ badge │ │
+│                                                    └───────┘ │
+└──────────────────────────────────────────────────────────────┘
 ```
 
 **Key Features:**
 
--   **Non-blocking I/O** - Handles multiple simultaneous connections
--   **State Machine** - Implements SMTP protocol states (HELO, MAIL, RCPT, DATA)
--   **Multi-part Parsing** - Separates HTML and plain text content
--   **Content Decoding** - Handles quoted-printable and base64 encoding
+-   **Non-blocking I/O**: one `socket_select` loop handles many connections, with an idle timeout
+-   **State machine**: HELO/EHLO, AUTH, MAIL, RCPT and DATA states, with dot-stuffing and size limits
+-   **Fail-safe**: a malformed email is logged to `storage/logs/smtp.log` and never stops the server
 
 ### Email Processing Flow
 
@@ -343,65 +344,59 @@ Email Sent ──▶ SMTP Server ──▶ Parse Headers ──▶ Extract Conte
 
 ### Database Schema
 
-**`emails` table:**
+**`emails`**
 
-| Column        | Type      | Description                      |
-| ------------- | --------- | -------------------------------- |
-| `id`          | bigint    | Primary key                      |
-| `from`        | string    | Sender email address             |
-| `to`          | string    | Recipient email address(es)      |
-| `subject`     | string    | Email subject line               |
-| `body_text`   | longtext  | Plain text content               |
-| `body_html`   | longtext  | HTML content                     |
-| `attachments` | json      | Array of attachment metadata     |
-| `raw`         | longtext  | Complete raw email for debugging |
-| `received_at` | timestamp | When email was received          |
-| `created_at`  | timestamp | Database creation time           |
-| `updated_at`  | timestamp | Last update time                 |
+| Column        | Type      | Description                                   |
+| ------------- | --------- | --------------------------------------------- |
+| `id`          | bigint    | Primary key                                   |
+| `from`        | string    | Sender address                                |
+| `to`          | string    | To addresses                                  |
+| `cc`          | text      | CC addresses                                  |
+| `bcc`         | text      | Envelope recipients not listed in To or CC    |
+| `subject`     | string    | Decoded subject line                          |
+| `body_text`   | longtext  | Plain-text part (UTF-8)                       |
+| `body_html`   | longtext  | HTML part (UTF-8)                             |
+| `raw`         | longtext  | The complete message as received              |
+| `is_read`     | boolean   | Read state                                    |
+| `received_at` | timestamp | When it was captured (indexed)                |
+
+**`email_attachments`**: one row per attachment (`name`, `content_type`, `size`, `content_id`, `inline`, and the file bytes in `content`), deleted along with its email.
+
+**`settings`**: key/value store for the port, retention and release relay settings.
 
 ---
 
 ## 🎨 Features in Detail
 
-### Filament Admin Panel
-
-Native Mailer uses **Filament 4.0** for its admin interface, providing:
-
--   **Email List View**: Sortable, searchable table with pagination
--   **Email Detail View**: Full email preview with HTML rendering
--   **Bulk Actions**: Delete multiple emails at once
--   **Search Filters**: Find emails by sender, recipient, or subject
--   **Date Sorting**: Sort emails by received date
+The full guide is in **[FEATURES.md](FEATURES.md)**. A few highlights:
 
 ### Email Preview System
 
-HTML emails are rendered in a sandboxed iframe for security:
+HTML emails are rendered in a sandboxed iframe with an opaque origin:
 
 ```blade
-<iframe
-    srcdoc="{{ $email->body_html }}"
-    sandbox="allow-same-origin"
-    class="email-iframe"
-/>
+<iframe srcdoc="{{ $email->previewHtml() }}" sandbox="allow-scripts"></iframe>
 ```
 
-**Security Features:**
-
--   Sandboxed iframe prevents JavaScript execution
--   No external resource loading
--   Isolated from parent document
+-   The iframe can't access the app: there's no `allow-same-origin`
+-   A Content-Security-Policy injected into the email only allows Native Mailer's own link handler (by nonce). The email's scripts, event handlers and `javascript:` links are blocked
+-   Clicked links are passed to the app and opened in your default browser
+-   Remote images and styles load as they would in a real mail client
 
 ### SMTP Protocol Implementation
 
-The SMTP server implements essential SMTP commands:
+| Command       | Description                                   | Example                            |
+| ------------- | --------------------------------------------- | ---------------------------------- |
+| `HELO`/`EHLO` | Start a session (EHLO lists extensions)       | `EHLO client.example.com`          |
+| `AUTH`        | `PLAIN` or `LOGIN`; any credentials accepted  | `AUTH PLAIN AHVzZXIAc2VjcmV0`      |
+| `MAIL FROM`   | Sender, with optional `SIZE=`                 | `MAIL FROM:<sender@example.com>`   |
+| `RCPT TO`     | A recipient (repeat for each)                 | `RCPT TO:<recipient@example.com>`  |
+| `DATA`        | The message, ending with a line of `.`        | `DATA`                             |
+| `RSET`        | Abort the current message                     | `RSET`                             |
+| `NOOP`        | Do nothing                                    | `NOOP`                             |
+| `QUIT`        | Close the connection                          | `QUIT`                             |
 
-| Command     | Description           | Example                           |
-| ----------- | --------------------- | --------------------------------- |
-| `HELO/EHLO` | Initiate connection   | `EHLO client.example.com`         |
-| `MAIL FROM` | Specify sender        | `MAIL FROM:<sender@example.com>`  |
-| `RCPT TO`   | Specify recipient     | `RCPT TO:<recipient@example.com>` |
-| `DATA`      | Begin message content | `DATA`                            |
-| `QUIT`      | Close connection      | `QUIT`                            |
+EHLO advertises `SIZE`, `AUTH PLAIN LOGIN`, `8BITMIME` and `SMTPUTF8`.
 
 ---
 
@@ -413,12 +408,17 @@ The SMTP server implements essential SMTP commands:
 # Run all tests
 php artisan test
 
-# Run with Pest
-./vendor/bin/pest
-
-# Run specific test file
-php artisan test --filter=EmailTest
+# Run one file or test
+php artisan test --filter=MimeMessageParserTest
 ```
+
+The suite includes:
+
+-   **Unit tests** for the SMTP session, the MIME parser and the HTML checks
+-   **Fixture tests** against real `.eml` messages in `tests/Fixtures/emails/`
+-   **An integration test** that starts the real `smtp:start` on a free port and sends mail to it over TCP (needs the `sockets` extension)
+
+GitHub Actions runs the tests and a Pint style check on every pull request (`.github/workflows/tests.yml`).
 
 ### Code Quality
 
@@ -434,20 +434,8 @@ Format code using Laravel Pint:
 
 ### Development Workflow
 
-For active development with hot-reload:
-
 ```bash
-# Terminal 1: Run the native app
-php artisan native:serve
-
-# Terminal 2: Watch assets (in separate terminal)
-npm run dev
-```
-
-Or use the convenience script:
-
-```bash
-# Runs everything concurrently
+# Runs the desktop app and the Vite dev server together
 composer native:dev
 ```
 
@@ -475,20 +463,12 @@ QUIT
 
 ### Debugging
 
-Enable detailed logging in `config/nativephp.php`:
-
-```php
-'phpIni' => [
-    'display_errors' => '1',
-    'error_reporting' => 'E_ALL',
-    'log_errors' => '1',
-],
-```
-
 Logs are stored in:
 
--   `storage/logs/laravel.log` - Application logs
--   `storage/logs/smtp.log` - SMTP-specific logs
+-   `storage/logs/laravel.log`: application logs, including catcher start-up errors
+-   `storage/logs/smtp.log`: emails that failed to parse or store, with the start of the raw message
+
+The php.ini settings for the desktop app are in `NativeAppServiceProvider::phpIni()`. `display_errors` is off so errors never render in the app window; they go to the logs.
 
 ---
 
@@ -496,10 +476,10 @@ Logs are stored in:
 
 ### Port Already in Use
 
-If port 1025 is already occupied:
+The status line under the inbox title tells you when another program holds the port. Either pick a different port in **Settings** (and update `MAIL_PORT` in your apps), or free the port:
 
 ```bash
-# Windows - Find process using port 1025
+# Windows - find the process using port 1025
 netstat -ano | findstr :1025
 taskkill /F /PID <PID>
 
@@ -509,12 +489,10 @@ lsof -ti:1025 | xargs kill -9
 
 ### Database Issues
 
-Reset the database:
+The desktop app in development uses `database/nativephp.sqlite`. To start over (this deletes all captured emails):
 
 ```bash
-rm database/database.sqlite
-touch database/database.sqlite
-php artisan migrate:fresh
+php artisan native:migrate:fresh
 ```
 
 ### Build Issues

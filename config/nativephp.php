@@ -94,7 +94,6 @@ return [
         'send_test_email.py',
         '.env.example',
         'package-lock.json',
-        'composer.lock',
         'vendor/*/*/docs',
         'vendor/*/*/.github',
         'vendor/*/*/CHANGELOG.md',

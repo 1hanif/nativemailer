@@ -18,6 +18,8 @@
 
 [Features](#-features) • [Installation](#-installation) • [Usage](#-usage) • [Features guide](FEATURES.md)
 
+[![Fund my work on FLOSSAfrica](https://flossafrica.com/badge.svg)](https://flossafrica.com/m/projecthanif?p=nativemailer)
+
 </div>
 
 ---
